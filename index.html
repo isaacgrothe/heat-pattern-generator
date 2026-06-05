@@ -203,6 +203,48 @@ input[type="color"] {
 
 /* ── Hidden sym-N control ─────────────────────────────────────────────── */
 #sym-n-ctrl { display: none; }
+
+/* ── Gradient stop rows ───────────────────────────────────────────────── */
+#grad-preview {
+  height: 14px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  border: 1px solid #333;
+}
+.stop-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+.stop-row input[type="color"] {
+  width: 26px;
+  height: 20px;
+  flex-shrink: 0;
+  padding: 1px;
+}
+.stop-row input[type="range"] {
+  flex: 1;
+}
+.stop-row .stop-pct {
+  color: #555;
+  font-size: 10px;
+  min-width: 28px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.stop-row .del-btn {
+  padding: 1px 5px;
+  border: 1px solid #3a3a3a;
+  border-radius: 3px;
+  background: #1e1e1e;
+  color: #555;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+.stop-row .del-btn:hover { color: #e06060; border-color: #e06060; }
 </style>
 </head>
 <body>
@@ -468,6 +510,21 @@ input[type="color"] {
     </div>
   </div>
 
+  <!-- ── GRADIENT ──────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title" onclick="toggleSection(this)">
+      Gradient <span class="chevron">▾</span>
+    </div>
+    <div class="section-body">
+      <div id="grad-preview"></div>
+      <div id="stop-list"></div>
+      <div class="row2" style="margin-top:4px;">
+        <button class="btn" onclick="addStop()">+ Add stop</button>
+        <button class="btn" onclick="resetStops()">↺ Reset</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── RANDOMNESS ─────────────────────────────────────────────────── -->
   <div class="section">
     <div class="section-title" onclick="toggleSection(this)">
@@ -663,16 +720,72 @@ function applySymmetry(tiles, sym, W, H) {
   return out;
 }
 
-// ── Gradient stops (from Heat_gradient.svg) ────────────────────────────────
-const STOPS = [
-  [14.4231, '#0000FF'],
-  [43.75,   '#00D4FF'],
-  [64.4231, '#A9FF5E'],
-  [74.0385, '#D7C62D'],
-  [81.7308, '#F3842D'],
-  [89.9038, '#EA2481'],
-  [96.875,  '#E942FF'],
+// ── Gradient stops (mutable) ───────────────────────────────────────────────
+const DEFAULT_STOPS = [
+  { o: 14.4231, c: '#0000FF' },
+  { o: 43.75,   c: '#00D4FF' },
+  { o: 64.4231, c: '#A9FF5E' },
+  { o: 74.0385, c: '#D7C62D' },
+  { o: 81.7308, c: '#F3842D' },
+  { o: 89.9038, c: '#EA2481' },
+  { o: 96.875,  c: '#E942FF' },
 ];
+let gradStops = DEFAULT_STOPS.map(s => ({ ...s }));
+
+function renderStopList() {
+  const canDelete = gradStops.length > 2;
+  $('stop-list').innerHTML = gradStops.map((s, i) => `
+    <div class="stop-row">
+      <input type="color" value="${s.c}" oninput="updateStopColor(${i}, this.value)">
+      <input type="range" min="0" max="100" step="0.5" value="${s.o.toFixed(1)}"
+             oninput="updateStopOffset(${i}, parseFloat(this.value))">
+      <span class="stop-pct">${s.o.toFixed(0)}%</span>
+      ${canDelete ? `<button class="del-btn" onclick="removeStop(${i})">✕</button>` : ''}
+    </div>`).join('');
+
+  // Update CSS gradient preview (left→right mirrors bottom→top in SVG)
+  const css = gradStops.map(s => `${s.c} ${s.o}%`).join(', ');
+  $('grad-preview').style.background = `linear-gradient(to right, ${css})`;
+}
+
+function updateStopColor(i, color) {
+  gradStops[i].c = color;
+  renderStopList();
+  update();
+}
+
+function updateStopOffset(i, offset) {
+  gradStops[i].o = offset;
+  gradStops.sort((a, b) => a.o - b.o);
+  renderStopList();
+  update();
+}
+
+function removeStop(i) {
+  gradStops.splice(i, 1);
+  renderStopList();
+  update();
+}
+
+function addStop() {
+  // Find the largest gap and insert in the middle of it
+  let maxGap = -1, insertAfter = 0;
+  for (let i = 0; i < gradStops.length - 1; i++) {
+    const gap = gradStops[i + 1].o - gradStops[i].o;
+    if (gap > maxGap) { maxGap = gap; insertAfter = i; }
+  }
+  const newO = (gradStops[insertAfter].o + gradStops[insertAfter + 1].o) / 2;
+  // Interpolate color between neighbors
+  gradStops.splice(insertAfter + 1, 0, { o: newO, c: '#ffffff' });
+  renderStopList();
+  update();
+}
+
+function resetStops() {
+  gradStops = DEFAULT_STOPS.map(s => ({ ...s }));
+  renderStopList();
+  update();
+}
 
 // ── Build SVG string ───────────────────────────────────────────────────────
 function buildSVG() {
@@ -693,7 +806,7 @@ function buildSVG() {
 
   // Gradient def
   const gtAttr = ga ? ` gradientTransform="rotate(${ga},0.5,0.5)"` : '';
-  const stops = STOPS.map(([o, c]) => `<stop offset="${o}%" stop-color="${c}"/>`).join('');
+  const stops = gradStops.map(s => `<stop offset="${s.o}%" stop-color="${s.c}"/>`).join('');
   const gradDef = `<linearGradient id="hg" gradientUnits="objectBoundingBox" x1=".5" y1="1" x2=".5" y2="0"${gtAttr}>${stops}</linearGradient>`;
   const clipDef = clip ? `<clipPath id="cp"><rect width="${W}" height="${H}"/></clipPath>` : '';
 
@@ -787,6 +900,7 @@ $('sym-chips').addEventListener('click', e => {
 window.addEventListener('resize', scalePreview);
 
 // ── Init ───────────────────────────────────────────────────────────────────
+renderStopList();
 update();
 </script>
 </body>

@@ -618,6 +618,76 @@ input[type="color"] {
     </div>
   </div>
 
+  <!-- ── TEXT MASK ─────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title" onclick="toggleSection(this)">
+      Text Mask <span class="chevron">▾</span>
+    </div>
+    <div class="section-body">
+      <label class="check-row">
+        <input type="checkbox" id="textMaskEnabled" onchange="onTextMaskToggle()">
+        <span>Enable text mask</span>
+      </label>
+      <div id="text-mask-ctrl" style="display:none">
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Characters</span></div>
+          <input type="text" id="textMaskContent" value="&amp;" maxlength="8"
+                 style="width:100%;background:#141414;border:1px solid #363636;color:#eee;padding:6px 9px;border-radius:5px;font-size:22px;font-family:inherit;outline:none;letter-spacing:0.08em;margin-top:4px"
+                 oninput="update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Font size (%H)</span><span class="ctrl-value" id="v-textFontSize">70</span></div>
+          <input type="range" id="textFontSize" min="5" max="200" value="70" oninput="sv('textFontSize');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Weight</span></div>
+          <div class="chips" id="textWeight-chips" style="margin-bottom:0">
+            <div class="chip" data-w="400">Regular</div>
+            <div class="chip active" data-w="700">Bold</div>
+            <div class="chip" data-w="900">Black</div>
+          </div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Style</span></div>
+          <div class="chips" id="textStyle-chips" style="margin-bottom:0">
+            <div class="chip active" data-fs="normal">Normal</div>
+            <div class="chip" data-fs="italic">Italic</div>
+          </div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Font</span></div>
+          <select id="textFont" onchange="update()"
+                  style="width:100%;background:#141414;border:1px solid #363636;color:#ccc;padding:5px 8px;border-radius:5px;font-size:12px;outline:none;margin-top:2px">
+            <option value="Arial, sans-serif">Sans-serif (Arial)</option>
+            <option value="Georgia, serif">Serif (Georgia)</option>
+            <option value="Impact, sans-serif">Impact</option>
+            <option value="'Times New Roman', serif">Times New Roman</option>
+            <option value="'Courier New', monospace">Monospace</option>
+          </select>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Mode</span></div>
+          <div class="chips" id="textMode-chips" style="margin-bottom:0">
+            <div class="chip active" data-m="inside">Inside</div>
+            <div class="chip" data-m="outside">Outside</div>
+          </div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Letter spacing</span><span class="ctrl-value" id="v-textSpacing">0</span></div>
+          <input type="range" id="textSpacing" min="-100" max="500" value="0" oninput="sv('textSpacing');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>X offset</span><span class="ctrl-value" id="v-textOffX">0</span></div>
+          <input type="range" id="textOffX" min="-800" max="800" value="0" oninput="sv('textOffX');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Y offset</span><span class="ctrl-value" id="v-textOffY">0</span></div>
+          <input type="range" id="textOffY" min="-800" max="800" value="0" oninput="sv('textOffY');update()">
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── GRADIENT ──────────────────────────────────────────────────── -->
   <div class="section">
     <div class="section-title" onclick="toggleSection(this)">
@@ -672,7 +742,7 @@ input[type="color"] {
 'use strict';
 
 // ── App state ──────────────────────────────────────────────────────────────
-const S = { pattern: 'grid', sym: 'none', burstCorner: 'TL', fillMode: 'gradient' };
+const S = { pattern: 'grid', sym: 'none', burstCorner: 'TL', fillMode: 'gradient', textWeight: '700', textMode: 'inside' };
 
 // ── Seeded PRNG (mulberry32) ───────────────────────────────────────────────
 function mkRng(seed) {
@@ -1020,9 +1090,32 @@ function buildSVG() {
   const gradDef = `<linearGradient id="hg" gradientUnits="objectBoundingBox" x1=".5" y1="1" x2=".5" y2="0"${gtAttr}>${stops}</linearGradient>`;
   const clipDef = clip ? `<clipPath id="cp"><rect width="${W}" height="${H}"/></clipPath>` : '';
 
+  // Text mask def
+  let textMaskDef = '';
+  let innerGroupAttr = '';
+  if (cb('textMaskEnabled')) {
+    const rawText = $('textMaskContent').value || '?';
+    const safeText = rawText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const fontSize = (fv('textFontSize') / 100 * H).toFixed(0);
+    const fontFamily = $('textFont').value;
+    const fontWeight = S.textWeight;
+    const fontStyle  = S.textStyle || 'normal';
+    const spacing    = fv('textSpacing');
+    const tx = (W / 2 + fv('textOffX')).toFixed(1);
+    const ty = (H / 2 + fv('textOffY')).toFixed(1);
+    const spacingAttr = spacing !== 0 ? ` letter-spacing="${spacing}"` : '';
+    const textAttrs = `x="${tx}" y="${ty}" text-anchor="middle" dominant-baseline="middle" font-size="${fontSize}" font-weight="${fontWeight}" font-style="${fontStyle}" font-family="${fontFamily}"${spacingAttr}`;
+    if (S.textMode === 'inside') {
+      textMaskDef = `<clipPath id="tm"><text ${textAttrs}>${safeText}</text></clipPath>`;
+      innerGroupAttr = ' clip-path="url(#tm)"';
+    } else {
+      textMaskDef = `<mask id="tm"><rect width="${W}" height="${H}" fill="white"/><text ${textAttrs} fill="black">${safeText}</text></mask>`;
+      innerGroupAttr = ' mask="url(#tm)"';
+    }
+  }
+
   // Tile elements
   const cr         = fv('cornerRadius');
-  const rxAttr     = cr > 0 ? ` rx="${cr}"` : '';
   const blendStyle = blend !== 'normal' ? ` style="mix-blend-mode:${blend}"` : '';
   const clipAttr   = clip ? ` clip-path="url(#cp)"` : '';
   const rects = tiles.map(({ cx, cy, w, h, rot }, i) => {
@@ -1036,11 +1129,11 @@ function buildSVG() {
 
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
-    `<defs>${gradDef}${clipDef}</defs>`,
+    `<defs>${gradDef}${clipDef}${textMaskDef}</defs>`,
     `<rect width="${W}" height="${H}" fill="${bg}"/>`,
-    `<g${clipAttr}>`,
+    `<g${clipAttr}><g${innerGroupAttr}>`,
     rects,
-    `</g>`,
+    `</g></g>`,
     `</svg>`
   ].join('\n');
 }
@@ -1176,6 +1269,36 @@ $('burst-corner-chips').addEventListener('click', e => {
   if (!c) return;
   S.burstCorner = c.dataset.corner;
   document.querySelectorAll('#burst-corner-chips .chip').forEach(ch => ch.classList.toggle('active', ch === c));
+  update();
+});
+
+// ── Text mask ───────────────────────────────────────────────────────────────
+function onTextMaskToggle() {
+  $('text-mask-ctrl').style.display = cb('textMaskEnabled') ? 'block' : 'none';
+  update();
+}
+
+$('textWeight-chips').addEventListener('click', e => {
+  const c = e.target.closest('.chip');
+  if (!c) return;
+  S.textWeight = c.dataset.w;
+  document.querySelectorAll('#textWeight-chips .chip').forEach(ch => ch.classList.toggle('active', ch === c));
+  update();
+});
+
+$('textStyle-chips').addEventListener('click', e => {
+  const c = e.target.closest('.chip');
+  if (!c) return;
+  S.textStyle = c.dataset.fs;
+  document.querySelectorAll('#textStyle-chips .chip').forEach(ch => ch.classList.toggle('active', ch === c));
+  update();
+});
+
+$('textMode-chips').addEventListener('click', e => {
+  const c = e.target.closest('.chip');
+  if (!c) return;
+  S.textMode = c.dataset.m;
+  document.querySelectorAll('#textMode-chips .chip').forEach(ch => ch.classList.toggle('active', ch === c));
   update();
 });
 

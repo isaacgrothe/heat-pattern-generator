@@ -860,7 +860,7 @@ const DEFAULT_STOPS = [
 ];
 let gradStops = DEFAULT_STOPS.map(s => ({ ...s }));
 let nextId = 7;
-let selId  = null;
+let selId  = DEFAULT_STOPS[0].id;  // pre-select first stop
 let dragId = null;
 
 function renderGradEditor() {

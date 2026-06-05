@@ -204,47 +204,65 @@ input[type="color"] {
 /* ── Hidden sym-N control ─────────────────────────────────────────────── */
 #sym-n-ctrl { display: none; }
 
-/* ── Gradient stop rows ───────────────────────────────────────────────── */
-#grad-preview {
-  height: 14px;
+/* ── Gradient editor ──────────────────────────────────────────────────── */
+#grad-editor { user-select: none; margin-bottom: 10px; }
+
+#grad-bar {
+  height: 22px;
   border-radius: 4px;
-  margin-bottom: 10px;
   border: 1px solid #333;
+  cursor: crosshair;
 }
-.stop-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 7px;
-}
-.stop-row input[type="color"] {
-  width: 26px;
+
+#grad-track {
+  position: relative;
   height: 20px;
-  flex-shrink: 0;
-  padding: 1px;
+  margin-top: 5px;
 }
-.stop-row input[type="range"] {
-  flex: 1;
+
+.grad-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.35);
+  transform: translateX(-50%);
+  top: 3px;
+  cursor: grab;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.7);
+  transition: border-color 0.1s, box-shadow 0.1s;
 }
-.stop-row .stop-pct {
-  color: #555;
-  font-size: 10px;
-  min-width: 28px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+.grad-handle.sel {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px #6878f0, 0 1px 4px rgba(0,0,0,0.7);
+  cursor: grabbing;
+  z-index: 1;
 }
-.stop-row .del-btn {
-  padding: 1px 5px;
+
+#stop-ctrl {
+  background: #181818;
+  border: 1px solid #2e2e2e;
+  border-radius: 5px;
+  padding: 8px;
+  margin-bottom: 8px;
+  display: none;
+}
+#stop-ctrl .row { display: flex; align-items: center; gap: 8px; }
+#stop-ctrl-pct { color: #666; font-size: 11px; flex: 1; font-variant-numeric: tabular-nums; }
+#stop-ctrl input[type="color"] { width: 36px; height: 24px; }
+
+.del-btn {
+  padding: 3px 8px;
   border: 1px solid #3a3a3a;
-  border-radius: 3px;
-  background: #1e1e1e;
-  color: #555;
+  border-radius: 4px;
+  background: #222;
+  color: #777;
   cursor: pointer;
   font-size: 11px;
-  line-height: 1.4;
-  flex-shrink: 0;
+  font-family: inherit;
+  transition: color 0.1s, border-color 0.1s;
 }
-.stop-row .del-btn:hover { color: #e06060; border-color: #e06060; }
+.del-btn:hover { color: #e06060; border-color: #804040; }
 </style>
 </head>
 <body>
@@ -516,12 +534,19 @@ input[type="color"] {
       Gradient <span class="chevron">▾</span>
     </div>
     <div class="section-body">
-      <div id="grad-preview"></div>
-      <div id="stop-list"></div>
-      <div class="row2" style="margin-top:4px;">
-        <button class="btn" onclick="addStop()">+ Add stop</button>
-        <button class="btn" onclick="resetStops()">↺ Reset</button>
+      <div style="color:#666;font-size:10px;margin-bottom:6px;">Click bar to add · Drag handles to move</div>
+      <div id="grad-editor">
+        <div id="grad-bar"></div>
+        <div id="grad-track"></div>
       </div>
+      <div id="stop-ctrl">
+        <div class="row">
+          <span id="stop-ctrl-pct">—</span>
+          <input type="color" id="stop-color-input" oninput="onStopColorChange(this.value)">
+          <button class="del-btn" id="stop-del-btn" onclick="removeSelectedStop()">Remove</button>
+        </div>
+      </div>
+      <button class="btn" style="width:100%;" onclick="resetStops()">↺ Reset gradient</button>
     </div>
   </div>
 
@@ -667,10 +692,9 @@ function genWave(rng, W, H) {
       const x = t * W;
       const y = baseY + amp * Math.sin(angle);
       let rot = 0;
-      if (follow && tc > 1) {
-        const dy = amp * freq * 2 * Math.PI * Math.cos(angle);
-        const dx = W / (tc - 1);
-        rot = Math.atan2(dy, dx) * 180 / Math.PI;
+      if (follow) {
+        // dy/dt and dx/dt where x = t*W, so dx/dt = W
+        rot = Math.atan2(amp * freq * 2 * Math.PI * Math.cos(angle), W) * 180 / Math.PI;
       }
       tiles.push({ cx: x, cy: y, w: tw, h: th, rot });
     }
@@ -720,71 +744,109 @@ function applySymmetry(tiles, sym, W, H) {
   return out;
 }
 
-// ── Gradient stops (mutable) ───────────────────────────────────────────────
+// ── Gradient stops ─────────────────────────────────────────────────────────
 const DEFAULT_STOPS = [
-  { o: 14.4231, c: '#0000FF' },
-  { o: 43.75,   c: '#00D4FF' },
-  { o: 64.4231, c: '#A9FF5E' },
-  { o: 74.0385, c: '#D7C62D' },
-  { o: 81.7308, c: '#F3842D' },
-  { o: 89.9038, c: '#EA2481' },
-  { o: 96.875,  c: '#E942FF' },
+  { o: 14.4231, c: '#0000FF', id: 0 },
+  { o: 43.75,   c: '#00D4FF', id: 1 },
+  { o: 64.4231, c: '#A9FF5E', id: 2 },
+  { o: 74.0385, c: '#D7C62D', id: 3 },
+  { o: 81.7308, c: '#F3842D', id: 4 },
+  { o: 89.9038, c: '#EA2481', id: 5 },
+  { o: 96.875,  c: '#E942FF', id: 6 },
 ];
 let gradStops = DEFAULT_STOPS.map(s => ({ ...s }));
+let nextId = 7;
+let selId  = null;
+let dragId = null;
 
-function renderStopList() {
-  const canDelete = gradStops.length > 2;
-  $('stop-list').innerHTML = gradStops.map((s, i) => `
-    <div class="stop-row">
-      <input type="color" value="${s.c}" oninput="updateStopColor(${i}, this.value)">
-      <input type="range" min="0" max="100" step="0.5" value="${s.o.toFixed(1)}"
-             oninput="updateStopOffset(${i}, parseFloat(this.value))">
-      <span class="stop-pct">${s.o.toFixed(0)}%</span>
-      ${canDelete ? `<button class="del-btn" onclick="removeStop(${i})">✕</button>` : ''}
-    </div>`).join('');
+function renderGradEditor() {
+  const css = gradStops.map(s => `${s.c} ${s.o.toFixed(2)}%`).join(', ');
+  $('grad-bar').style.background = `linear-gradient(to right, ${css})`;
 
-  // Update CSS gradient preview (left→right mirrors bottom→top in SVG)
-  const css = gradStops.map(s => `${s.c} ${s.o}%`).join(', ');
-  $('grad-preview').style.background = `linear-gradient(to right, ${css})`;
-}
+  $('grad-track').innerHTML = gradStops.map(s =>
+    `<div class="grad-handle${s.id === selId ? ' sel' : ''}"
+          style="left:${s.o}%;background:${s.c}"
+          data-id="${s.id}"></div>`
+  ).join('');
 
-function updateStopColor(i, color) {
-  gradStops[i].c = color;
-  renderStopList();
-  update();
-}
-
-function updateStopOffset(i, offset) {
-  gradStops[i].o = offset;
-  gradStops.sort((a, b) => a.o - b.o);
-  renderStopList();
-  update();
-}
-
-function removeStop(i) {
-  gradStops.splice(i, 1);
-  renderStopList();
-  update();
-}
-
-function addStop() {
-  // Find the largest gap and insert in the middle of it
-  let maxGap = -1, insertAfter = 0;
-  for (let i = 0; i < gradStops.length - 1; i++) {
-    const gap = gradStops[i + 1].o - gradStops[i].o;
-    if (gap > maxGap) { maxGap = gap; insertAfter = i; }
+  const sel = gradStops.find(s => s.id === selId);
+  if (sel) {
+    $('stop-ctrl').style.display = '';
+    $('stop-ctrl-pct').textContent = sel.o.toFixed(1) + '%';
+    $('stop-color-input').value = sel.c;
+    $('stop-del-btn').style.display = gradStops.length > 2 ? '' : 'none';
+  } else {
+    $('stop-ctrl').style.display = 'none';
   }
-  const newO = (gradStops[insertAfter].o + gradStops[insertAfter + 1].o) / 2;
-  // Interpolate color between neighbors
-  gradStops.splice(insertAfter + 1, 0, { o: newO, c: '#ffffff' });
-  renderStopList();
+}
+
+// Click gradient bar → add stop at that position
+$('grad-bar').addEventListener('click', e => {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const pct  = Math.max(0, Math.min(100, (e.clientX - rect.left) / rect.width * 100));
+  const id   = nextId++;
+  gradStops.push({ o: parseFloat(pct.toFixed(2)), c: interpolateGradColor(pct), id });
+  gradStops.sort((a, b) => a.o - b.o);
+  selId = id;
+  renderGradEditor();
+  update();
+});
+
+// Mousedown on handle → select + begin drag
+$('grad-track').addEventListener('mousedown', e => {
+  const h = e.target.closest('.grad-handle');
+  if (!h) return;
+  e.preventDefault();
+  dragId = selId = parseInt(h.dataset.id);
+  renderGradEditor();
+});
+
+document.addEventListener('mousemove', e => {
+  if (dragId === null) return;
+  const rect = $('grad-bar').getBoundingClientRect();
+  const pct  = Math.max(0, Math.min(100, (e.clientX - rect.left) / rect.width * 100));
+  const s    = gradStops.find(s => s.id === dragId);
+  if (s) { s.o = parseFloat(pct.toFixed(1)); gradStops.sort((a, b) => a.o - b.o); renderGradEditor(); update(); }
+});
+
+document.addEventListener('mouseup', () => { dragId = null; });
+
+function onStopColorChange(color) {
+  const s = gradStops.find(s => s.id === selId);
+  if (s) { s.c = color; renderGradEditor(); update(); }
+}
+
+function removeSelectedStop() {
+  if (gradStops.length <= 2) return;
+  gradStops = gradStops.filter(s => s.id !== selId);
+  selId = gradStops[0]?.id ?? null;
+  renderGradEditor();
   update();
 }
 
 function resetStops() {
   gradStops = DEFAULT_STOPS.map(s => ({ ...s }));
-  renderStopList();
+  selId = null;
+  renderGradEditor();
   update();
+}
+
+// Color interpolation helpers
+function hexToRgb(h) { return [1,3,5].map(i => parseInt(h.slice(i,i+2),16)); }
+function rgbToHex(r,g,b) { return '#'+[r,g,b].map(v=>Math.round(Math.max(0,Math.min(255,v))).toString(16).padStart(2,'0')).join(''); }
+function interpolateGradColor(pct) {
+  if (pct <= gradStops[0].o) return gradStops[0].c;
+  const last = gradStops[gradStops.length-1];
+  if (pct >= last.o) return last.c;
+  for (let i = 0; i < gradStops.length-1; i++) {
+    const a = gradStops[i], b = gradStops[i+1];
+    if (a.o <= pct && pct <= b.o) {
+      const t = (pct-a.o)/(b.o-a.o);
+      const [r1,g1,b1] = hexToRgb(a.c), [r2,g2,b2] = hexToRgb(b.c);
+      return rgbToHex(r1+(r2-r1)*t, g1+(g2-g1)*t, b1+(b2-b1)*t);
+    }
+  }
+  return '#ffffff';
 }
 
 // ── Build SVG string ───────────────────────────────────────────────────────
@@ -806,7 +868,7 @@ function buildSVG() {
 
   // Gradient def
   const gtAttr = ga ? ` gradientTransform="rotate(${ga},0.5,0.5)"` : '';
-  const stops = gradStops.map(s => `<stop offset="${s.o}%" stop-color="${s.c}"/>`).join('');
+  const stops = gradStops.map(s => `<stop offset="${s.o.toFixed(2)}%" stop-color="${s.c}"/>`).join('');
   const gradDef = `<linearGradient id="hg" gradientUnits="objectBoundingBox" x1=".5" y1="1" x2=".5" y2="0"${gtAttr}>${stops}</linearGradient>`;
   const clipDef = clip ? `<clipPath id="cp"><rect width="${W}" height="${H}"/></clipPath>` : '';
 
@@ -900,7 +962,7 @@ $('sym-chips').addEventListener('click', e => {
 window.addEventListener('resize', scalePreview);
 
 // ── Init ───────────────────────────────────────────────────────────────────
-renderStopList();
+renderGradEditor();
 update();
 </script>
 </body>

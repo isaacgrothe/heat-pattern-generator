@@ -875,12 +875,12 @@ function renderGradEditor() {
 
   const sel = gradStops.find(s => s.id === selId);
   if (sel) {
-    $('stop-ctrl').style.display = '';
+    $('stop-ctrl').style.display = 'block';
     $('stop-ctrl-pct').textContent = sel.o.toFixed(1) + '%';
     $('stop-color-input').value = sel.c;
     $('stop-hex-input').value = sel.c;
     $('stop-hex-input').classList.remove('invalid');
-    $('stop-del-btn').style.display = gradStops.length > 2 ? '' : 'none';
+    $('stop-del-btn').style.display = gradStops.length > 2 ? 'inline-block' : 'none';
   } else {
     $('stop-ctrl').style.display = 'none';
   }

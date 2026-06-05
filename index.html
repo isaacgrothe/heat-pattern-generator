@@ -330,6 +330,7 @@ input[type="color"] {
         <div class="chip" data-p="wave">Wave</div>
         <div class="chip" data-p="scatter">Scatter</div>
         <div class="chip" data-p="burst">Burst</div>
+        <div class="chip" data-p="text">Text</div>
       </div>
 
       <!-- Grid -->
@@ -498,6 +499,78 @@ input[type="color"] {
         <div class="ctrl">
           <div class="ctrl-label"><span>Max scale</span><span class="ctrl-value" id="v-scatterMax">1.4</span></div>
           <input type="range" id="scatterMax" min="0.1" max="6" step="0.1" value="1.4" oninput="sv('scatterMax');update()">
+        </div>
+      </div>
+
+      <!-- Text -->
+      <div class="param-group" id="pg-text">
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Characters</span></div>
+          <input type="text" id="txtContent" value="&amp;" maxlength="12"
+                 style="width:100%;background:#141414;border:1px solid #363636;color:#eee;padding:6px 9px;border-radius:5px;font-size:22px;font-family:inherit;outline:none;letter-spacing:0.08em;margin-top:4px"
+                 oninput="update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Font size (%H)</span><span class="ctrl-value" id="v-txtSize">70</span></div>
+          <input type="range" id="txtSize" min="5" max="200" value="70" oninput="sv('txtSize');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Weight</span></div>
+          <div class="chips" id="txtWeight-chips" style="margin-bottom:0">
+            <div class="chip" data-tw="400">Regular</div>
+            <div class="chip active" data-tw="700">Bold</div>
+            <div class="chip" data-tw="900">Black</div>
+          </div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Font</span></div>
+          <select id="txtFont" onchange="update()"
+                  style="width:100%;background:#141414;border:1px solid #363636;color:#ccc;padding:5px 8px;border-radius:5px;font-size:12px;outline:none;margin-top:2px">
+            <option value="Arial, sans-serif">Sans-serif (Arial)</option>
+            <option value="Georgia, serif">Serif (Georgia)</option>
+            <option value="Impact, sans-serif">Impact</option>
+            <option value="'Times New Roman', serif">Times New Roman</option>
+            <option value="'Courier New', monospace">Monospace</option>
+          </select>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Columns</span><span class="ctrl-value" id="v-txtCols">36</span></div>
+          <input type="range" id="txtCols" min="4" max="150" value="36" oninput="sv('txtCols');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Rows</span><span class="ctrl-value" id="v-txtRows">18</span></div>
+          <input type="range" id="txtRows" min="2" max="100" value="18" oninput="sv('txtRows');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Gap X</span><span class="ctrl-value" id="v-txtGapX">4</span></div>
+          <input type="range" id="txtGapX" min="0" max="60" value="4" oninput="sv('txtGapX');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Gap Y</span><span class="ctrl-value" id="v-txtGapY">4</span></div>
+          <input type="range" id="txtGapY" min="0" max="60" value="4" oninput="sv('txtGapY');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Edge threshold</span><span class="ctrl-value" id="v-txtThresh">20</span></div>
+          <input type="range" id="txtThresh" min="1" max="99" value="20" oninput="sv('txtThresh');update()">
+        </div>
+        <label class="check-row">
+          <input type="checkbox" id="txtSmooth" checked onchange="update()">
+          <span>Scale tiles by edge alpha</span>
+        </label>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Mode</span></div>
+          <div class="chips" id="txtMode-chips" style="margin-bottom:0">
+            <div class="chip active" data-tm="inside">Inside</div>
+            <div class="chip" data-tm="outside">Outside</div>
+          </div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>X offset</span><span class="ctrl-value" id="v-txtOffX">0</span></div>
+          <input type="range" id="txtOffX" min="-800" max="800" value="0" oninput="sv('txtOffX');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Y offset</span><span class="ctrl-value" id="v-txtOffY">0</span></div>
+          <input type="range" id="txtOffY" min="-800" max="800" value="0" oninput="sv('txtOffY');update()">
         </div>
       </div>
     </div>
@@ -742,7 +815,7 @@ input[type="color"] {
 'use strict';
 
 // ── App state ──────────────────────────────────────────────────────────────
-const S = { pattern: 'grid', sym: 'none', burstCorner: 'TL', fillMode: 'gradient', textWeight: '700', textMode: 'inside' };
+const S = { pattern: 'grid', sym: 'none', burstCorner: 'TL', fillMode: 'gradient', textWeight: '700', textMode: 'inside', txtWeight: '700', txtMode: 'inside' };
 
 // ── Seeded PRNG (mulberry32) ───────────────────────────────────────────────
 function mkRng(seed) {
@@ -893,6 +966,66 @@ function genBurst(rng, W, H) {
         cy: oy + radius * Math.sin(rayAngle),
         w: tw * scale, h: th * scale, rot
       });
+    }
+  }
+  return tiles;
+}
+
+function genText(rng, W, H) {
+  // Rasterize the character(s) to a downscaled offscreen canvas for fast pixel lookup
+  const RW = Math.min(W, 1200);
+  const RH = Math.round(H * RW / W);
+  const sx = W / RW, sy = H / RH;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = RW; canvas.height = RH;
+  const ctx = canvas.getContext('2d');
+
+  const text     = $('txtContent').value || '?';
+  const fontSize = (fv('txtSize') / 100 * RH).toFixed(0);
+  const font     = $('txtFont').value;
+  const weight   = S.txtWeight;
+  const offX     = fv('txtOffX') / sx;
+  const offY     = fv('txtOffY') / sy;
+
+  ctx.font         = `${weight} ${fontSize}px ${font}`;
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle    = '#000';
+  ctx.fillText(text, RW / 2 + offX, RH / 2 + offY);
+
+  const pxData = ctx.getImageData(0, 0, RW, RH).data;
+
+  function getAlpha(wx, wy) {
+    const rx = Math.max(0, Math.min(RW - 1, Math.round(wx / sx)));
+    const ry = Math.max(0, Math.min(RH - 1, Math.round(wy / sy)));
+    return pxData[(ry * RW + rx) * 4 + 3] / 255;
+  }
+
+  const cols    = iv('txtCols'), rows = iv('txtRows');
+  const gx      = fv('txtGapX'), gy   = fv('txtGapY');
+  const thresh  = fv('txtThresh') / 100;
+  const smooth  = cb('txtSmooth');
+  const outside = S.txtMode === 'outside';
+
+  // Cell size fills the entire canvas uniformly
+  const cellW = W / cols;
+  const cellH = H / rows;
+  const tw    = Math.max(1, cellW - gx);
+  const th    = Math.max(1, cellH - gy);
+
+  const tiles = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cx = (c + 0.5) * cellW;
+      const cy = (r + 0.5) * cellH;
+      const a  = getAlpha(cx, cy);
+      const inChar = a >= thresh;
+      if (outside ? !inChar : inChar) {
+        // Scale tile size by alpha so edges taper naturally — the letter "grows" from density
+        const sf = smooth ? Math.max(0.04, outside ? (1 - a) : a) : 1;
+        tiles.push({ cx, cy, w: tw * sf, h: th * sf, rot: 0 });
+      }
     }
   }
   return tiles;
@@ -1079,7 +1212,7 @@ function buildSVG() {
   const rng = mkRng(fv('seed') | 0);
 
   // Generate + transform tiles
-  const gens = { grid: genGrid, spiral: genSpiral, radial: genRadial, wave: genWave, scatter: genScatter, burst: genBurst };
+  const gens = { grid: genGrid, spiral: genSpiral, radial: genRadial, wave: genWave, scatter: genScatter, burst: genBurst, text: genText };
   let tiles = gens[S.pattern](rng, W, H);
   tiles = tiles.map(t => ({ ...t, rot: t.rot + rotBase + (rng() - 0.5) * 2 * rotRand }));
   tiles = applySymmetry(tiles, S.sym, W, H);
@@ -1269,6 +1402,22 @@ $('burst-corner-chips').addEventListener('click', e => {
   if (!c) return;
   S.burstCorner = c.dataset.corner;
   document.querySelectorAll('#burst-corner-chips .chip').forEach(ch => ch.classList.toggle('active', ch === c));
+  update();
+});
+
+// ── Text pattern chips ──────────────────────────────────────────────────────
+$('txtWeight-chips').addEventListener('click', e => {
+  const c = e.target.closest('.chip');
+  if (!c) return;
+  S.txtWeight = c.dataset.tw;
+  document.querySelectorAll('#txtWeight-chips .chip').forEach(ch => ch.classList.toggle('active', ch === c));
+  update();
+});
+$('txtMode-chips').addEventListener('click', e => {
+  const c = e.target.closest('.chip');
+  if (!c) return;
+  S.txtMode = c.dataset.tm;
+  document.querySelectorAll('#txtMode-chips .chip').forEach(ch => ch.classList.toggle('active', ch === c));
   update();
 });
 

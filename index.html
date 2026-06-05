@@ -527,6 +527,26 @@ input[type="color"] {
         <input type="range" id="cornerRadius" min="0" max="200" value="0" oninput="sv('cornerRadius');update()">
       </div>
       <div class="ctrl">
+        <div class="ctrl-label"><span>Fill mode</span></div>
+        <div class="chips" id="fill-chips" style="margin-bottom:0">
+          <div class="chip active" data-fill="gradient">Gradient</div>
+          <div class="chip" data-fill="flat">Flat color</div>
+          <div class="chip" data-fill="alternating">Alternating</div>
+        </div>
+      </div>
+      <div id="flat-ctrl" style="display:none" class="ctrl">
+        <div class="color-row">
+          <span>Color</span>
+          <input type="color" id="flatColor" value="#0055ff" oninput="onFlatColorChange(this.value)">
+          <input type="text" id="flatHex" maxlength="7" value="#0055ff" oninput="onFlatHexInput(this.value)"
+                 style="width:74px;background:#141414;border:1px solid #363636;color:#ccc;padding:4px 7px;border-radius:5px;font-size:12px;font-family:'SF Mono',monospace;outline:none;letter-spacing:0.03em">
+        </div>
+      </div>
+      <div id="alt-ctrl" style="display:none">
+        <div id="alt-color-list"></div>
+        <button class="btn" style="width:100%;margin-top:4px" onclick="addAltColor()">+ Add color</button>
+      </div>
+      <div class="ctrl">
         <div class="ctrl-label"><span>Opacity</span><span class="ctrl-value" id="v-opacity">1</span></div>
         <input type="range" id="opacity" min="0.02" max="1" step="0.02" value="1" oninput="sv('opacity');update()">
       </div>
@@ -650,7 +670,7 @@ input[type="color"] {
 'use strict';
 
 // ── App state ──────────────────────────────────────────────────────────────
-const S = { pattern: 'grid', sym: 'none', burstCorner: 'TL' };
+const S = { pattern: 'grid', sym: 'none', burstCorner: 'TL', fillMode: 'gradient' };
 
 // ── Seeded PRNG (mulberry32) ───────────────────────────────────────────────
 function mkRng(seed) {
@@ -1003,10 +1023,13 @@ function buildSVG() {
   const rxAttr     = cr > 0 ? ` rx="${cr}"` : '';
   const blendStyle = blend !== 'normal' ? ` style="mix-blend-mode:${blend}"` : '';
   const clipAttr   = clip ? ` clip-path="url(#cp)"` : '';
-  const rects = tiles.map(({ cx, cy, w, h, rot }) => {
+  const rects = tiles.map(({ cx, cy, w, h, rot }, i) => {
+    const fill = S.fillMode === 'flat'        ? $('flatColor').value :
+                 S.fillMode === 'alternating' ? altColors[i % altColors.length] :
+                 'url(#hg)';
     const rxClamped = cr > 0 ? Math.min(cr, w / 2, h / 2).toFixed(1) : null;
     const rx = rxClamped ? ` rx="${rxClamped}"` : '';
-    return `<rect x="${(-w/2).toFixed(1)}" y="${(-h/2).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}"${rx} fill="url(#hg)" opacity="${opacity}" transform="translate(${cx.toFixed(1)},${cy.toFixed(1)}) rotate(${rot.toFixed(2)})"${blendStyle}/>`;
+    return `<rect x="${(-w/2).toFixed(1)}" y="${(-h/2).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}"${rx} fill="${fill}" opacity="${opacity}" transform="translate(${cx.toFixed(1)},${cy.toFixed(1)}) rotate(${rot.toFixed(2)})"${blendStyle}/>`;
   }).join('\n');
 
   return [
@@ -1075,6 +1098,49 @@ function setSymmetry(s) {
   update();
 }
 
+// ── Fill mode ──────────────────────────────────────────────────────────────
+let altColors = ['#0000FF', '#E942FF', '#EA2481', '#F3842D'];
+
+function setFillMode(mode) {
+  S.fillMode = mode;
+  document.querySelectorAll('#fill-chips .chip').forEach(c => c.classList.toggle('active', c.dataset.fill === mode));
+  $('flat-ctrl').style.display  = mode === 'flat'        ? 'block' : 'none';
+  $('alt-ctrl').style.display   = mode === 'alternating' ? 'block' : 'none';
+  update();
+}
+
+function onFlatColorChange(color) { $('flatHex').value = color; update(); }
+function onFlatHexInput(raw) {
+  const hex = raw.startsWith('#') ? raw : '#' + raw;
+  if (/^#[0-9a-fA-F]{6}$/.test(hex)) { $('flatColor').value = hex; update(); }
+}
+
+function renderAltColors() {
+  $('alt-color-list').innerHTML = altColors.map((c, i) => `
+    <div class="stop-row">
+      <input type="color" value="${c}" oninput="updateAltColor(${i},this.value)" style="width:26px;height:22px;padding:1px;flex-shrink:0">
+      <input type="text" value="${c}" maxlength="7" oninput="onAltHexInput(${i},this.value)"
+             style="flex:1;background:#141414;border:1px solid #363636;color:#ccc;padding:4px 7px;border-radius:5px;font-size:12px;font-family:'SF Mono',monospace;outline:none">
+      ${altColors.length > 2 ? `<button class="del-btn" onclick="removeAltColor(${i})">✕</button>` : ''}
+    </div>`).join('');
+}
+
+function updateAltColor(i, color) { altColors[i] = color; renderAltColors(); update(); }
+function onAltHexInput(i, raw) {
+  const hex = raw.startsWith('#') ? raw : '#' + raw;
+  if (/^#[0-9a-fA-F]{6}$/.test(hex)) { altColors[i] = hex; renderAltColors(); update(); }
+}
+function addAltColor() {
+  if (altColors.length >= 8) return;
+  altColors.push('#ffffff');
+  renderAltColors(); update();
+}
+function removeAltColor(i) {
+  if (altColors.length <= 2) return;
+  altColors.splice(i, 1);
+  renderAltColors(); update();
+}
+
 function syncSquare() {
   if (cb('squareTiles')) { $('tileH').value = $('tileW').value; sv('tileH'); }
 }
@@ -1099,6 +1165,10 @@ $('sym-chips').addEventListener('click', e => {
   const c = e.target.closest('.chip');
   if (c) setSymmetry(c.dataset.s);
 });
+$('fill-chips').addEventListener('click', e => {
+  const c = e.target.closest('.chip');
+  if (c) setFillMode(c.dataset.fill);
+});
 $('burst-corner-chips').addEventListener('click', e => {
   const c = e.target.closest('.chip');
   if (!c) return;
@@ -1111,6 +1181,7 @@ window.addEventListener('resize', scalePreview);
 
 // ── Init ───────────────────────────────────────────────────────────────────
 renderGradEditor();
+renderAltColors();
 update();
 </script>
 </body>

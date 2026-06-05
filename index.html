@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Heat Gradient Pattern Generator</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: #141414;
+  color: #d0d0d0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 12px;
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────────────── */
+#sidebar {
+  width: 268px;
+  flex-shrink: 0;
+  background: #1e1e1e;
+  border-right: 1px solid #2c2c2c;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #3a3a3a #1e1e1e;
+}
+#sidebar::-webkit-scrollbar { width: 5px; }
+#sidebar::-webkit-scrollbar-track { background: #1e1e1e; }
+#sidebar::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 3px; }
+
+#sidebar-header {
+  padding: 13px 16px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #f0f0f0;
+  border-bottom: 1px solid #2c2c2c;
+  flex-shrink: 0;
+  letter-spacing: -0.015em;
+}
+
+/* ── Sections ─────────────────────────────────────────────────────────── */
+.section { border-bottom: 1px solid #2c2c2c; }
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #555;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.1s;
+}
+.section-title:hover { color: #888; }
+.section-title .chevron { font-size: 8px; transition: transform 0.15s; }
+.section.collapsed .chevron { transform: rotate(-90deg); }
+.section-body { padding: 6px 16px 14px; }
+.section.collapsed .section-body { display: none; }
+
+/* ── Controls ─────────────────────────────────────────────────────────── */
+.ctrl { margin-bottom: 9px; }
+.ctrl:last-child { margin-bottom: 0; }
+
+.ctrl-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+  color: #777;
+  font-size: 11px;
+}
+.ctrl-value { color: #bbb; font-variant-numeric: tabular-nums; }
+
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 3px;
+  background: #333;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 11px;
+  height: 11px;
+  background: #6878f0;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+input[type="range"]::-webkit-slider-thumb:hover { background: #8898ff; }
+
+input[type="number"], select {
+  width: 100%;
+  background: #141414;
+  border: 1px solid #363636;
+  color: #ccc;
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.1s;
+}
+input[type="number"]:focus, select:focus { border-color: #6878f0; }
+
+input[type="color"] {
+  -webkit-appearance: none;
+  width: 30px;
+  height: 22px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+  padding: 1px 2px;
+}
+
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+.color-row { display: flex; align-items: center; gap: 10px; }
+.color-row span { color: #777; font-size: 11px; flex: 1; }
+
+/* ── Chips ────────────────────────────────────────────────────────────── */
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+.chip {
+  padding: 4px 10px;
+  border: 1px solid #363636;
+  border-radius: 5px;
+  background: #141414;
+  color: #666;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+  transition: all 0.1s;
+  white-space: nowrap;
+}
+.chip:hover { border-color: #555; color: #aaa; }
+.chip.active { background: #4a58d8; border-color: #4a58d8; color: #fff; }
+
+/* ── Buttons ──────────────────────────────────────────────────────────── */
+.btn {
+  padding: 6px 10px;
+  border: 1px solid #363636;
+  border-radius: 5px;
+  background: #252525;
+  color: #bbb;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+  transition: background 0.1s;
+  white-space: nowrap;
+  text-align: center;
+}
+.btn:hover { background: #303030; }
+.btn.primary { background: #4a58d8; border-color: #4a58d8; color: #fff; font-size: 12px; padding: 8px 18px; }
+.btn.primary:hover { background: #5a68e8; }
+
+.check-row { display: flex; align-items: center; gap: 7px; cursor: pointer; margin-top: 2px; margin-bottom: 6px; }
+.check-row input[type="checkbox"] { accent-color: #6878f0; cursor: pointer; width: 12px; height: 12px; }
+.check-row span { color: #777; font-size: 11px; }
+
+/* ── Pattern params ───────────────────────────────────────────────────── */
+.param-group { display: none; }
+.param-group.visible { display: block; }
+
+/* ── Preview ──────────────────────────────────────────────────────────── */
+#preview {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0e0e0e;
+  position: relative;
+  overflow: hidden;
+}
+
+#canvas-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+#svg-container {
+  display: block;
+  line-height: 0;
+  box-shadow: 0 6px 60px rgba(0,0,0,0.8);
+}
+
+#export-bar {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Hidden sym-N control ─────────────────────────────────────────────── */
+#sym-n-ctrl { display: none; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div id="sidebar-header">Heat Gradient Patterns</div>
+
+  <!-- ── CANVAS ─────────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title" onclick="toggleSection(this)">
+      Canvas <span class="chevron">▾</span>
+    </div>
+    <div class="section-body">
+      <div class="ctrl">
+        <div class="ctrl-label"><span>Width × Height (px)</span></div>
+        <div class="row2">
+          <input type="number" id="canvasW" value="1920" min="100" max="8000" onchange="update()">
+          <input type="number" id="canvasH" value="1080" min="100" max="8000" onchange="update()">
+        </div>
+      </div>
+      <div class="ctrl">
+        <div class="row2">
+          <button class="btn" onclick="setDims(1920,1080)">1080p</button>
+          <button class="btn" onclick="setDims(3840,2160)">4K</button>
+          <button class="btn" onclick="setDims(1080,1080)">Square</button>
+          <button class="btn" onclick="setDims(1080,1920)">Portrait</button>
+        </div>
+      </div>
+      <div class="ctrl">
+        <div class="color-row">
+          <span>Background</span>
+          <input type="color" id="bgColor" value="#aaaaaa" onchange="update()">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PATTERN ────────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title" onclick="toggleSection(this)">
+      Pattern <span class="chevron">▾</span>
+    </div>
+    <div class="section-body">
+      <div class="chips" id="pattern-chips">
+        <div class="chip active" data-p="grid">Grid</div>
+        <div class="chip" data-p="spiral">Spiral</div>
+        <div class="chip" data-p="radial">Radial</div>
+        <div class="chip" data-p="wave">Wave</div>
+        <div class="chip" data-p="scatter">Scatter</div>
+      </div>
+
+      <!-- Grid -->
+      <div class="param-group visible" id="pg-grid">
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Columns</span><span class="ctrl-value" id="v-gridCols">14</span></div>
+          <input type="range" id="gridCols" min="1" max="60" value="14" oninput="sv('gridCols');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Rows</span><span class="ctrl-value" id="v-gridRows">5</span></div>
+          <input type="range" id="gridRows" min="1" max="60" value="5" oninput="sv('gridRows');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Gap X</span><span class="ctrl-value" id="v-gridGapX">10</span></div>
+          <input type="range" id="gridGapX" min="0" max="300" value="10" oninput="sv('gridGapX');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Gap Y</span><span class="ctrl-value" id="v-gridGapY">10</span></div>
+          <input type="range" id="gridGapY" min="0" max="300" value="10" oninput="sv('gridGapY');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Row stagger</span><span class="ctrl-value" id="v-gridStagger">0</span></div>
+          <input type="range" id="gridStagger" min="0" max="1" step="0.05" value="0" oninput="sv('gridStagger');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Size by center distance</span><span class="ctrl-value" id="v-gridSizeDist">0</span></div>
+          <input type="range" id="gridSizeDist" min="-1" max="1" step="0.05" value="0" oninput="sv('gridSizeDist');update()">
+        </div>
+      </div>
+
+      <!-- Spiral -->
+      <div class="param-group" id="pg-spiral">
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Count</span><span class="ctrl-value" id="v-spiralCount">70</span></div>
+          <input type="range" id="spiralCount" min="5" max="300" value="70" oninput="sv('spiralCount');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Expansion rate</span><span class="ctrl-value" id="v-spiralB">16</span></div>
+          <input type="range" id="spiralB" min="1" max="100" value="16" oninput="sv('spiralB');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Angle step (°)</span><span class="ctrl-value" id="v-spiralAngle">22</span></div>
+          <input type="range" id="spiralAngle" min="2" max="90" value="22" oninput="sv('spiralAngle');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Start radius</span><span class="ctrl-value" id="v-spiralInitR">20</span></div>
+          <input type="range" id="spiralInitR" min="0" max="400" value="20" oninput="sv('spiralInitR');update()">
+        </div>
+        <label class="check-row">
+          <input type="checkbox" id="spiralFollow" checked onchange="update()">
+          <span>Rotate tiles along path</span>
+        </label>
+      </div>
+
+      <!-- Radial -->
+      <div class="param-group" id="pg-radial">
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Arms</span><span class="ctrl-value" id="v-radialArms">8</span></div>
+          <input type="range" id="radialArms" min="1" max="32" value="8" oninput="sv('radialArms');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Tiles per arm</span><span class="ctrl-value" id="v-radialPerArm">10</span></div>
+          <input type="range" id="radialPerArm" min="1" max="40" value="10" oninput="sv('radialPerArm');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Min radius</span><span class="ctrl-value" id="v-radialMinR">60</span></div>
+          <input type="range" id="radialMinR" min="0" max="600" value="60" oninput="sv('radialMinR');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Max radius</span><span class="ctrl-value" id="v-radialMaxR">500</span></div>
+          <input type="range" id="radialMaxR" min="50" max="1400" value="500" oninput="sv('radialMaxR');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Start angle (°)</span><span class="ctrl-value" id="v-radialStart">0</span></div>
+          <input type="range" id="radialStart" min="0" max="360" value="0" oninput="sv('radialStart');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Size taper</span><span class="ctrl-value" id="v-radialTaper">1</span></div>
+          <input type="range" id="radialTaper" min="0" max="3" step="0.05" value="1" oninput="sv('radialTaper');update()">
+        </div>
+        <label class="check-row">
+          <input type="checkbox" id="radialFollow" checked onchange="update()">
+          <span>Rotate tiles along arm</span>
+        </label>
+      </div>
+
+      <!-- Wave -->
+      <div class="param-group" id="pg-wave">
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Wave count</span><span class="ctrl-value" id="v-waveCount">5</span></div>
+          <input type="range" id="waveCount" min="1" max="24" value="5" oninput="sv('waveCount');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Tiles per wave</span><span class="ctrl-value" id="v-waveTiles">22</span></div>
+          <input type="range" id="waveTiles" min="2" max="80" value="22" oninput="sv('waveTiles');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Amplitude</span><span class="ctrl-value" id="v-waveAmp">90</span></div>
+          <input type="range" id="waveAmp" min="0" max="600" value="90" oninput="sv('waveAmp');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Frequency</span><span class="ctrl-value" id="v-waveFreq">2</span></div>
+          <input type="range" id="waveFreq" min="0.25" max="12" step="0.25" value="2" oninput="sv('waveFreq');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Phase shift</span><span class="ctrl-value" id="v-wavePhase">0.5</span></div>
+          <input type="range" id="wavePhase" min="0" max="2" step="0.05" value="0.5" oninput="sv('wavePhase');update()">
+        </div>
+        <label class="check-row">
+          <input type="checkbox" id="waveFollow" checked onchange="update()">
+          <span>Rotate tiles along wave</span>
+        </label>
+      </div>
+
+      <!-- Scatter -->
+      <div class="param-group" id="pg-scatter">
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Count</span><span class="ctrl-value" id="v-scatterCount">120</span></div>
+          <input type="range" id="scatterCount" min="5" max="600" value="120" oninput="sv('scatterCount');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Min scale</span><span class="ctrl-value" id="v-scatterMin">0.2</span></div>
+          <input type="range" id="scatterMin" min="0.05" max="2" step="0.05" value="0.2" oninput="sv('scatterMin');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Max scale</span><span class="ctrl-value" id="v-scatterMax">1.4</span></div>
+          <input type="range" id="scatterMax" min="0.1" max="6" step="0.1" value="1.4" oninput="sv('scatterMax');update()">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TILE ───────────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title" onclick="toggleSection(this)">
+      Tile <span class="chevron">▾</span>
+    </div>
+    <div class="section-body">
+      <div class="ctrl">
+        <div class="ctrl-label"><span>Width</span><span class="ctrl-value" id="v-tileW">80</span></div>
+        <input type="range" id="tileW" min="4" max="600" value="80" oninput="sv('tileW');update()">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-label"><span>Height</span><span class="ctrl-value" id="v-tileH">210</span></div>
+        <input type="range" id="tileH" min="4" max="900" value="210" oninput="sv('tileH');update()">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-label"><span>Opacity</span><span class="ctrl-value" id="v-opacity">1</span></div>
+        <input type="range" id="opacity" min="0.02" max="1" step="0.02" value="1" oninput="sv('opacity');update()">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-label"><span>Gradient angle (°)</span><span class="ctrl-value" id="v-gradAngle">0</span></div>
+        <input type="range" id="gradAngle" min="0" max="360" value="0" oninput="sv('gradAngle');update()">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-label"><span>Blend mode</span></div>
+        <select id="blendMode" onchange="update()">
+          <option value="normal">Normal</option>
+          <option value="multiply">Multiply</option>
+          <option value="screen">Screen</option>
+          <option value="overlay">Overlay</option>
+          <option value="color-dodge">Color Dodge</option>
+          <option value="color-burn">Color Burn</option>
+          <option value="hard-light">Hard Light</option>
+          <option value="soft-light">Soft Light</option>
+          <option value="difference">Difference</option>
+          <option value="exclusion">Exclusion</option>
+          <option value="hue">Hue</option>
+          <option value="saturation">Saturation</option>
+          <option value="luminosity">Luminosity</option>
+        </select>
+      </div>
+      <label class="check-row">
+        <input type="checkbox" id="clipCanvas" onchange="update()">
+        <span>Clip to canvas</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- ── ROTATION ───────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title" onclick="toggleSection(this)">
+      Rotation <span class="chevron">▾</span>
+    </div>
+    <div class="section-body">
+      <div class="ctrl">
+        <div class="ctrl-label"><span>Base rotation (°)</span><span class="ctrl-value" id="v-rotBase">0</span></div>
+        <input type="range" id="rotBase" min="-180" max="180" value="0" oninput="sv('rotBase');update()">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-label"><span>Random range (±°)</span><span class="ctrl-value" id="v-rotRand">0</span></div>
+        <input type="range" id="rotRand" min="0" max="180" value="0" oninput="sv('rotRand');update()">
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SYMMETRY ───────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title" onclick="toggleSection(this)">
+      Symmetry <span class="chevron">▾</span>
+    </div>
+    <div class="section-body">
+      <div class="chips" id="sym-chips">
+        <div class="chip active" data-s="none">None</div>
+        <div class="chip" data-s="H">Horiz</div>
+        <div class="chip" data-s="V">Vert</div>
+        <div class="chip" data-s="HV">Both</div>
+        <div class="chip" data-s="R">Radial</div>
+      </div>
+      <div class="ctrl" id="sym-n-ctrl">
+        <div class="ctrl-label"><span>N-fold</span><span class="ctrl-value" id="v-symN">4</span></div>
+        <input type="range" id="symN" min="2" max="16" value="4" oninput="sv('symN');update()">
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RANDOMNESS ─────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title" onclick="toggleSection(this)">
+      Randomness <span class="chevron">▾</span>
+    </div>
+    <div class="section-body">
+      <div class="ctrl">
+        <div class="ctrl-label"><span>Seed</span></div>
+        <div class="row2">
+          <input type="number" id="seed" value="42" min="0" max="999999" onchange="update()">
+          <button class="btn" onclick="randomizeSeed()">↻ New seed</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Preview ──────────────────────────────────────────────────────────── -->
+<div id="preview">
+  <div id="canvas-wrapper">
+    <div id="svg-container"></div>
+  </div>
+  <div id="export-bar">
+    <button class="btn primary" onclick="exportSVG()">Export SVG</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── App state ──────────────────────────────────────────────────────────────
+const S = { pattern: 'grid', sym: 'none' };
+
+// ── Seeded PRNG (mulberry32) ───────────────────────────────────────────────
+function mkRng(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s += 0x6D2B79F5;
+    let t = Math.imul(s ^ s >>> 15, 1 | s);
+    t ^= t + Math.imul(t ^ t >>> 7, 61 | t);
+    return ((t ^ t >>> 14) >>> 0) / 2 ** 32;
+  };
+}
+
+// ── DOM helpers ────────────────────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const fv = id => parseFloat($(id).value);
+const iv = id => Math.round(fv(id));
+const cb = id => $(id).checked;
+
+// Sync slider → label
+function sv(id) { $('v-' + id).textContent = $(id).value; }
+
+// ── Pattern generators ─────────────────────────────────────────────────────
+// Tile shape: { cx, cy, w, h, rot }  (cx/cy = center, rot = degrees)
+
+function genGrid(rng, W, H) {
+  const cols = iv('gridCols'), rows = iv('gridRows');
+  const gx = fv('gridGapX'), gy = fv('gridGapY');
+  const stagger = fv('gridStagger');
+  const sd = fv('gridSizeDist');
+  const tw = fv('tileW'), th = fv('tileH');
+
+  const spanW = cols * tw + (cols - 1) * gx;
+  const spanH = rows * th + (rows - 1) * gy;
+  const ox = (W - spanW) / 2 + tw / 2;
+  const oy = (H - spanH) / 2 + th / 2;
+  const norm = Math.hypot(W / 2, H / 2) || 1;
+  const tiles = [];
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const staggerOff = (r % 2 === 1) ? stagger * (tw + gx) : 0;
+      const cx = ox + c * (tw + gx) + staggerOff;
+      const cy = oy + r * (th + gy);
+      let scale = 1;
+      if (sd !== 0) {
+        const dist = Math.hypot(cx - W / 2, cy - H / 2) / norm;
+        scale = Math.max(0.05, 1 + sd * (0.5 - dist) * 2);
+      }
+      tiles.push({ cx, cy, w: tw * scale, h: th * scale, rot: 0 });
+    }
+  }
+  return tiles;
+}
+
+function genSpiral(rng, W, H) {
+  const count = iv('spiralCount');
+  const b = fv('spiralB');
+  const step = fv('spiralAngle') * Math.PI / 180;
+  const initR = fv('spiralInitR');
+  const follow = cb('spiralFollow');
+  const tw = fv('tileW'), th = fv('tileH');
+  const cx = W / 2, cy = H / 2;
+
+  return Array.from({ length: count }, (_, i) => {
+    const theta = i * step;
+    const r = initR + b * theta;
+    const rot = follow ? theta * 180 / Math.PI + 90 : 0;
+    return { cx: cx + r * Math.cos(theta), cy: cy + r * Math.sin(theta), w: tw, h: th, rot };
+  });
+}
+
+function genRadial(rng, W, H) {
+  const arms = iv('radialArms'), per = iv('radialPerArm');
+  const minR = fv('radialMinR'), maxR = fv('radialMaxR');
+  const startA = fv('radialStart') * Math.PI / 180;
+  const taper = fv('radialTaper');
+  const follow = cb('radialFollow');
+  const tw = fv('tileW'), th = fv('tileH');
+  const cx = W / 2, cy = H / 2;
+  const tiles = [];
+
+  for (let a = 0; a < arms; a++) {
+    const angle = startA + (a / arms) * 2 * Math.PI;
+    for (let j = 0; j < per; j++) {
+      const t = per > 1 ? j / (per - 1) : 0;
+      const r = minR + t * (maxR - minR);
+      const scale = taper === 0 ? 1 : Math.max(0.04, Math.pow(t, taper));
+      const rot = follow ? angle * 180 / Math.PI + 90 : 0;
+      tiles.push({ cx: cx + r * Math.cos(angle), cy: cy + r * Math.sin(angle), w: tw * scale, h: th * scale, rot });
+    }
+  }
+  return tiles;
+}
+
+function genWave(rng, W, H) {
+  const wc = iv('waveCount'), tc = iv('waveTiles');
+  const amp = fv('waveAmp'), freq = fv('waveFreq'), phase = fv('wavePhase');
+  const follow = cb('waveFollow');
+  const tw = fv('tileW'), th = fv('tileH');
+  const tiles = [];
+
+  for (let w = 0; w < wc; w++) {
+    const baseY = ((w + 0.5) / wc) * H;
+    const phaseOff = w * phase * Math.PI;
+    for (let i = 0; i < tc; i++) {
+      const t = tc > 1 ? i / (tc - 1) : 0.5;
+      const angle = freq * t * 2 * Math.PI + phaseOff;
+      const x = t * W;
+      const y = baseY + amp * Math.sin(angle);
+      let rot = 0;
+      if (follow && tc > 1) {
+        const dy = amp * freq * 2 * Math.PI * Math.cos(angle);
+        const dx = W / (tc - 1);
+        rot = Math.atan2(dy, dx) * 180 / Math.PI;
+      }
+      tiles.push({ cx: x, cy: y, w: tw, h: th, rot });
+    }
+  }
+  return tiles;
+}
+
+function genScatter(rng, W, H) {
+  const count = iv('scatterCount');
+  const minS = fv('scatterMin'), maxS = fv('scatterMax');
+  const tw = fv('tileW'), th = fv('tileH');
+
+  return Array.from({ length: count }, () => {
+    const scale = minS + rng() * (maxS - minS);
+    return { cx: rng() * W, cy: rng() * H, w: tw * scale, h: th * scale, rot: rng() * 360 };
+  });
+}
+
+// ── Symmetry ───────────────────────────────────────────────────────────────
+function applySymmetry(tiles, sym, W, H) {
+  if (sym === 'none') return tiles;
+  const out = [];
+  const N = iv('symN');
+
+  if (sym === 'H') {
+    tiles.forEach(t => { out.push(t); out.push({ ...t, cx: W - t.cx, rot: -t.rot }); });
+  } else if (sym === 'V') {
+    tiles.forEach(t => { out.push(t); out.push({ ...t, cy: H - t.cy, rot: -t.rot }); });
+  } else if (sym === 'HV') {
+    // H-mirror first, then V-mirror the full set
+    const hSet = [];
+    tiles.forEach(t => { hSet.push(t); hSet.push({ ...t, cx: W - t.cx, rot: -t.rot }); });
+    hSet.forEach(t => { out.push(t); out.push({ ...t, cy: H - t.cy, rot: -t.rot }); });
+  } else if (sym === 'R') {
+    const cx = W / 2, cy = H / 2;
+    tiles.forEach(t => {
+      const dx = t.cx - cx, dy = t.cy - cy;
+      const r = Math.hypot(dx, dy);
+      const baseA = Math.atan2(dy, dx);
+      for (let i = 0; i < N; i++) {
+        const a = baseA + (i / N) * 2 * Math.PI;
+        out.push({ ...t, cx: cx + r * Math.cos(a), cy: cy + r * Math.sin(a), rot: t.rot + (i / N) * 360 });
+      }
+    });
+  }
+
+  return out;
+}
+
+// ── Gradient stops (from Heat_gradient.svg) ────────────────────────────────
+const STOPS = [
+  [14.4231, '#0000FF'],
+  [43.75,   '#00D4FF'],
+  [64.4231, '#A9FF5E'],
+  [74.0385, '#D7C62D'],
+  [81.7308, '#F3842D'],
+  [89.9038, '#EA2481'],
+  [96.875,  '#E942FF'],
+];
+
+// ── Build SVG string ───────────────────────────────────────────────────────
+function buildSVG() {
+  const W = fv('canvasW'), H = fv('canvasH');
+  const bg = $('bgColor').value;
+  const opacity = fv('opacity');
+  const ga = fv('gradAngle');
+  const blend = $('blendMode').value;
+  const clip = cb('clipCanvas');
+  const rotBase = fv('rotBase'), rotRand = fv('rotRand');
+  const rng = mkRng(fv('seed') | 0);
+
+  // Generate + transform tiles
+  const gens = { grid: genGrid, spiral: genSpiral, radial: genRadial, wave: genWave, scatter: genScatter };
+  let tiles = gens[S.pattern](rng, W, H);
+  tiles = tiles.map(t => ({ ...t, rot: t.rot + rotBase + (rng() - 0.5) * 2 * rotRand }));
+  tiles = applySymmetry(tiles, S.sym, W, H);
+
+  // Gradient def
+  const gtAttr = ga ? ` gradientTransform="rotate(${ga},0.5,0.5)"` : '';
+  const stops = STOPS.map(([o, c]) => `<stop offset="${o}%" stop-color="${c}"/>`).join('');
+  const gradDef = `<linearGradient id="hg" gradientUnits="objectBoundingBox" x1=".5" y1="1" x2=".5" y2="0"${gtAttr}>${stops}</linearGradient>`;
+  const clipDef = clip ? `<clipPath id="cp"><rect width="${W}" height="${H}"/></clipPath>` : '';
+
+  // Tile elements
+  const blendStyle = blend !== 'normal' ? ` style="mix-blend-mode:${blend}"` : '';
+  const clipAttr   = clip ? ` clip-path="url(#cp)"` : '';
+  const rects = tiles.map(({ cx, cy, w, h, rot }) =>
+    `<rect x="${(-w/2).toFixed(1)}" y="${(-h/2).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="url(#hg)" opacity="${opacity}" transform="translate(${cx.toFixed(1)},${cy.toFixed(1)}) rotate(${rot.toFixed(2)})"${blendStyle}/>`
+  ).join('\n');
+
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
+    `<defs>${gradDef}${clipDef}</defs>`,
+    `<rect width="${W}" height="${H}" fill="${bg}"/>`,
+    `<g${clipAttr}>`,
+    rects,
+    `</g>`,
+    `</svg>`
+  ].join('\n');
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+let _raf = null;
+function update() {
+  if (_raf) cancelAnimationFrame(_raf);
+  _raf = requestAnimationFrame(() => {
+    $('svg-container').innerHTML = buildSVG();
+    scalePreview();
+    _raf = null;
+  });
+}
+
+function scalePreview() {
+  const preview  = $('preview');
+  const svgEl    = $('svg-container').querySelector('svg');
+  if (!svgEl) return;
+  const W = fv('canvasW'), H = fv('canvasH');
+  const pad = 56;
+  const scale = Math.min((preview.clientWidth - pad) / W, (preview.clientHeight - pad) / H, 1);
+  svgEl.style.transform = `scale(${scale})`;
+  svgEl.style.transformOrigin = 'top left';
+  $('svg-container').style.width  = (W * scale) + 'px';
+  $('svg-container').style.height = (H * scale) + 'px';
+}
+
+// ── Export ─────────────────────────────────────────────────────────────────
+function exportSVG() {
+  const blob = new Blob([buildSVG()], { type: 'image/svg+xml;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: `heat-pattern-${Date.now()}.svg` });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── UI ─────────────────────────────────────────────────────────────────────
+function toggleSection(titleEl) {
+  titleEl.parentElement.classList.toggle('collapsed');
+}
+
+function setPattern(p) {
+  S.pattern = p;
+  document.querySelectorAll('#pattern-chips .chip').forEach(c => c.classList.toggle('active', c.dataset.p === p));
+  document.querySelectorAll('.param-group').forEach(g => g.classList.remove('visible'));
+  $('pg-' + p).classList.add('visible');
+  update();
+}
+
+function setSymmetry(s) {
+  S.sym = s;
+  document.querySelectorAll('#sym-chips .chip').forEach(c => c.classList.toggle('active', c.dataset.s === s));
+  $('sym-n-ctrl').style.display = s === 'R' ? 'block' : 'none';
+  update();
+}
+
+function setDims(w, h) { $('canvasW').value = w; $('canvasH').value = h; update(); }
+
+function randomizeSeed() { $('seed').value = Math.floor(Math.random() * 999999); update(); }
+
+// Event delegation for chip clicks
+$('pattern-chips').addEventListener('click', e => {
+  const c = e.target.closest('.chip');
+  if (c) setPattern(c.dataset.p);
+});
+$('sym-chips').addEventListener('click', e => {
+  const c = e.target.closest('.chip');
+  if (c) setSymmetry(c.dataset.s);
+});
+
+window.addEventListener('resize', scalePreview);
+
+// ── Init ───────────────────────────────────────────────────────────────────
+update();
+</script>
+</body>
+</html>

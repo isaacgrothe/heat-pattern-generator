@@ -494,11 +494,22 @@ input[type="color"] {
     <div class="section-body">
       <div class="ctrl">
         <div class="ctrl-label"><span>Width</span><span class="ctrl-value" id="v-tileW">80</span></div>
-        <input type="range" id="tileW" min="4" max="600" value="80" oninput="sv('tileW');update()">
+        <input type="range" id="tileW" min="4" max="600" value="80" oninput="sv('tileW');syncSquare();update()">
       </div>
       <div class="ctrl">
-        <div class="ctrl-label"><span>Height</span><span class="ctrl-value" id="v-tileH">210</span></div>
+        <div class="ctrl-label">
+          <span>Height</span>
+          <span class="ctrl-value" id="v-tileH">210</span>
+        </div>
         <input type="range" id="tileH" min="4" max="900" value="210" oninput="sv('tileH');update()">
+      </div>
+      <label class="check-row">
+        <input type="checkbox" id="squareTiles" onchange="onSquareToggle()">
+        <span>Square tiles</span>
+      </label>
+      <div class="ctrl">
+        <div class="ctrl-label"><span>Corner radius</span><span class="ctrl-value" id="v-cornerRadius">0</span></div>
+        <input type="range" id="cornerRadius" min="0" max="200" value="0" oninput="sv('cornerRadius');update()">
       </div>
       <div class="ctrl">
         <div class="ctrl-label"><span>Opacity</span><span class="ctrl-value" id="v-opacity">1</span></div>
@@ -950,11 +961,15 @@ function buildSVG() {
   const clipDef = clip ? `<clipPath id="cp"><rect width="${W}" height="${H}"/></clipPath>` : '';
 
   // Tile elements
+  const cr         = fv('cornerRadius');
+  const rxAttr     = cr > 0 ? ` rx="${cr}"` : '';
   const blendStyle = blend !== 'normal' ? ` style="mix-blend-mode:${blend}"` : '';
   const clipAttr   = clip ? ` clip-path="url(#cp)"` : '';
-  const rects = tiles.map(({ cx, cy, w, h, rot }) =>
-    `<rect x="${(-w/2).toFixed(1)}" y="${(-h/2).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="url(#hg)" opacity="${opacity}" transform="translate(${cx.toFixed(1)},${cy.toFixed(1)}) rotate(${rot.toFixed(2)})"${blendStyle}/>`
-  ).join('\n');
+  const rects = tiles.map(({ cx, cy, w, h, rot }) => {
+    const rxClamped = cr > 0 ? Math.min(cr, w / 2, h / 2).toFixed(1) : null;
+    const rx = rxClamped ? ` rx="${rxClamped}"` : '';
+    return `<rect x="${(-w/2).toFixed(1)}" y="${(-h/2).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}"${rx} fill="url(#hg)" opacity="${opacity}" transform="translate(${cx.toFixed(1)},${cy.toFixed(1)}) rotate(${rot.toFixed(2)})"${blendStyle}/>`;
+  }).join('\n');
 
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
@@ -1019,6 +1034,17 @@ function setSymmetry(s) {
   S.sym = s;
   document.querySelectorAll('#sym-chips .chip').forEach(c => c.classList.toggle('active', c.dataset.s === s));
   $('sym-n-ctrl').style.display = s === 'R' ? 'block' : 'none';
+  update();
+}
+
+function syncSquare() {
+  if (cb('squareTiles')) { $('tileH').value = $('tileW').value; sv('tileH'); }
+}
+function onSquareToggle() {
+  const sq = cb('squareTiles');
+  $('tileH').disabled = sq;
+  $('tileH').style.opacity = sq ? '0.35' : '1';
+  syncSquare();
   update();
 }
 

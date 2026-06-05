@@ -312,6 +312,7 @@ input[type="color"] {
         <div class="chip" data-p="radial">Radial</div>
         <div class="chip" data-p="wave">Wave</div>
         <div class="chip" data-p="scatter">Scatter</div>
+        <div class="chip" data-p="burst">Burst</div>
       </div>
 
       <!-- Grid -->
@@ -423,6 +424,47 @@ input[type="color"] {
         <label class="check-row">
           <input type="checkbox" id="waveFollow" checked onchange="update()">
           <span>Rotate tiles along wave</span>
+        </label>
+      </div>
+
+      <!-- Burst -->
+      <div class="param-group" id="pg-burst">
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Corner</span></div>
+          <div class="chips" id="burst-corner-chips" style="margin-bottom:0">
+            <div class="chip active" data-corner="TL">↘ Top-left</div>
+            <div class="chip" data-corner="TR">↙ Top-right</div>
+            <div class="chip" data-corner="BL">↗ Bot-left</div>
+            <div class="chip" data-corner="BR">↖ Bot-right</div>
+          </div>
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Rays</span><span class="ctrl-value" id="v-burstRays">14</span></div>
+          <input type="range" id="burstRays" min="1" max="40" value="14" oninput="sv('burstRays');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Tiles per ray</span><span class="ctrl-value" id="v-burstPerRay">10</span></div>
+          <input type="range" id="burstPerRay" min="1" max="40" value="10" oninput="sv('burstPerRay');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Spread angle (°)</span><span class="ctrl-value" id="v-burstSpread">90</span></div>
+          <input type="range" id="burstSpread" min="5" max="180" value="90" oninput="sv('burstSpread');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Min radius</span><span class="ctrl-value" id="v-burstMinR">20</span></div>
+          <input type="range" id="burstMinR" min="0" max="500" value="20" oninput="sv('burstMinR');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Max radius</span><span class="ctrl-value" id="v-burstMaxR">1600</span></div>
+          <input type="range" id="burstMaxR" min="100" max="3500" value="1600" oninput="sv('burstMaxR');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Corner tile scale</span><span class="ctrl-value" id="v-burstMinScale">0.08</span></div>
+          <input type="range" id="burstMinScale" min="0.02" max="1" step="0.02" value="0.08" oninput="sv('burstMinScale');update()">
+        </div>
+        <label class="check-row">
+          <input type="checkbox" id="burstFollow" checked onchange="update()">
+          <span>Rotate tiles along ray</span>
         </label>
       </div>
 
@@ -581,7 +623,7 @@ input[type="color"] {
 'use strict';
 
 // ── App state ──────────────────────────────────────────────────────────────
-const S = { pattern: 'grid', sym: 'none' };
+const S = { pattern: 'grid', sym: 'none', burstCorner: 'TL' };
 
 // ── Seeded PRNG (mulberry32) ───────────────────────────────────────────────
 function mkRng(seed) {
@@ -697,6 +739,41 @@ function genWave(rng, W, H) {
         rot = Math.atan2(amp * freq * 2 * Math.PI * Math.cos(angle), W) * 180 / Math.PI;
       }
       tiles.push({ cx: x, cy: y, w: tw, h: th, rot });
+    }
+  }
+  return tiles;
+}
+
+function genBurst(rng, W, H) {
+  const rays      = iv('burstRays');
+  const per       = iv('burstPerRay');
+  const spreadRad = fv('burstSpread') * Math.PI / 180;
+  const minR      = fv('burstMinR');
+  const maxR      = fv('burstMaxR');
+  const minScale  = fv('burstMinScale');
+  const follow    = cb('burstFollow');
+  const tw = fv('tileW'), th = fv('tileH');
+
+  // Origin and inward center angle for each corner (SVG: y increases downward)
+  const origins = { TL:[0,0], TR:[W,0], BL:[0,H], BR:[W,H] };
+  const centers = { TL:45,    TR:135,   BL:315,   BR:225   };
+  const [ox, oy] = origins[S.burstCorner];
+  const centerRad = centers[S.burstCorner] * Math.PI / 180;
+
+  const tiles = [];
+  for (let r = 0; r < rays; r++) {
+    const tRay     = rays > 1 ? r / (rays - 1) : 0.5;
+    const rayAngle = centerRad + (tRay - 0.5) * spreadRad;
+    for (let j = 0; j < per; j++) {
+      const t      = per > 1 ? j / (per - 1) : 0;
+      const radius = minR + t * (maxR - minR);
+      const scale  = minScale + t * (1 - minScale);   // small at corner, full size at edge
+      const rot    = follow ? rayAngle * 180 / Math.PI + 90 : 0;
+      tiles.push({
+        cx: ox + radius * Math.cos(rayAngle),
+        cy: oy + radius * Math.sin(rayAngle),
+        w: tw * scale, h: th * scale, rot
+      });
     }
   }
   return tiles;
@@ -861,7 +938,7 @@ function buildSVG() {
   const rng = mkRng(fv('seed') | 0);
 
   // Generate + transform tiles
-  const gens = { grid: genGrid, spiral: genSpiral, radial: genRadial, wave: genWave, scatter: genScatter };
+  const gens = { grid: genGrid, spiral: genSpiral, radial: genRadial, wave: genWave, scatter: genScatter, burst: genBurst };
   let tiles = gens[S.pattern](rng, W, H);
   tiles = tiles.map(t => ({ ...t, rot: t.rot + rotBase + (rng() - 0.5) * 2 * rotRand }));
   tiles = applySymmetry(tiles, S.sym, W, H);
@@ -957,6 +1034,13 @@ $('pattern-chips').addEventListener('click', e => {
 $('sym-chips').addEventListener('click', e => {
   const c = e.target.closest('.chip');
   if (c) setSymmetry(c.dataset.s);
+});
+$('burst-corner-chips').addEventListener('click', e => {
+  const c = e.target.closest('.chip');
+  if (!c) return;
+  S.burstCorner = c.dataset.corner;
+  document.querySelectorAll('#burst-corner-chips .chip').forEach(ch => ch.classList.toggle('active', ch === c));
+  update();
 });
 
 window.addEventListener('resize', scalePreview);

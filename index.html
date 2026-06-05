@@ -247,9 +247,24 @@ input[type="color"] {
   margin-bottom: 8px;
   display: none;
 }
-#stop-ctrl .row { display: flex; align-items: center; gap: 8px; }
-#stop-ctrl-pct { color: #666; font-size: 11px; flex: 1; font-variant-numeric: tabular-nums; }
-#stop-ctrl input[type="color"] { width: 36px; height: 24px; }
+#stop-ctrl .row { display: flex; align-items: center; gap: 7px; }
+#stop-ctrl-pct { color: #666; font-size: 11px; font-variant-numeric: tabular-nums; }
+#stop-ctrl input[type="color"] { width: 30px; height: 26px; flex-shrink: 0; }
+#stop-hex-input {
+  width: 74px;
+  flex-shrink: 0;
+  background: #141414;
+  border: 1px solid #363636;
+  color: #ccc;
+  padding: 4px 7px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  outline: none;
+  letter-spacing: 0.03em;
+}
+#stop-hex-input:focus { border-color: #6878f0; }
+#stop-hex-input.invalid { border-color: #c04040; color: #e08080; }
 
 .del-btn {
   padding: 3px 8px;
@@ -594,8 +609,9 @@ input[type="color"] {
       </div>
       <div id="stop-ctrl">
         <div class="row">
-          <span id="stop-ctrl-pct">—</span>
           <input type="color" id="stop-color-input" oninput="onStopColorChange(this.value)">
+          <input type="text" id="stop-hex-input" maxlength="7" placeholder="#000000" oninput="onStopHexInput(this.value)">
+          <span id="stop-ctrl-pct" style="flex:1">—</span>
           <button class="del-btn" id="stop-del-btn" onclick="removeSelectedStop()">Remove</button>
         </div>
       </div>
@@ -862,6 +878,8 @@ function renderGradEditor() {
     $('stop-ctrl').style.display = '';
     $('stop-ctrl-pct').textContent = sel.o.toFixed(1) + '%';
     $('stop-color-input').value = sel.c;
+    $('stop-hex-input').value = sel.c;
+    $('stop-hex-input').classList.remove('invalid');
     $('stop-del-btn').style.display = gradStops.length > 2 ? '' : 'none';
   } else {
     $('stop-ctrl').style.display = 'none';
@@ -901,7 +919,27 @@ document.addEventListener('mouseup', () => { dragId = null; });
 
 function onStopColorChange(color) {
   const s = gradStops.find(s => s.id === selId);
-  if (s) { s.c = color; renderGradEditor(); update(); }
+  if (s) {
+    s.c = color;
+    $('stop-hex-input').value = color;
+    $('stop-hex-input').classList.remove('invalid');
+    renderGradEditor();
+    update();
+  }
+}
+
+function onStopHexInput(raw) {
+  const hex = raw.startsWith('#') ? raw : '#' + raw;
+  const valid = /^#[0-9a-fA-F]{6}$/.test(hex);
+  $('stop-hex-input').classList.toggle('invalid', !valid);
+  if (!valid) return;
+  const s = gradStops.find(s => s.id === selId);
+  if (s) {
+    s.c = hex;
+    $('stop-color-input').value = hex;
+    renderGradEditor();
+    update();
+  }
 }
 
 function removeSelectedStop() {

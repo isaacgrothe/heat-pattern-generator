@@ -808,6 +808,7 @@ input[type="color"] {
   </div>
   <div id="export-bar">
     <button class="btn primary" onclick="exportSVG()">Export SVG</button>
+    <button class="btn" id="copyBtn" onclick="copySVG()">Copy SVG</button>
   </div>
 </div>
 
@@ -1296,6 +1297,14 @@ function scalePreview() {
 }
 
 // ── Export ─────────────────────────────────────────────────────────────────
+function copySVG() {
+  navigator.clipboard.writeText(buildSVG()).then(() => {
+    const btn = $('copyBtn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy SVG'; }, 1800);
+  });
+}
+
 function exportSVG() {
   const blob = new Blob([buildSVG()], { type: 'image/svg+xml;charset=utf-8' });
   const url  = URL.createObjectURL(blob);

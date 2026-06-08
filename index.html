@@ -862,6 +862,15 @@ input[type="color"] {
         <input type="range" id="animDuration" min="1" max="20" step="0.5" value="3" oninput="sv('animDuration')">
       </div>
       <div class="ctrl">
+        <div class="ctrl-label"><span>Easing</span></div>
+        <div class="chips" id="ease-chips" style="margin-bottom:0">
+          <div class="chip" data-ease="linear">Linear</div>
+          <div class="chip" data-ease="in">Ease In</div>
+          <div class="chip" data-ease="out">Ease Out</div>
+          <div class="chip active" data-ease="inout">In-Out</div>
+        </div>
+      </div>
+      <div class="ctrl">
         <div class="ctrl-label"><span>FPS</span></div>
         <div class="chips" id="fps-chips" style="margin-bottom:0">
           <div class="chip" data-fps="24">24</div>
@@ -869,6 +878,10 @@ input[type="color"] {
           <div class="chip" data-fps="60">60</div>
         </div>
       </div>
+      <label class="check-row">
+        <input type="checkbox" id="exportFullHD" checked>
+        <span>Force 1920×1080 output</span>
+      </label>
       <div class="ctrl" style="margin-top:4px">
         <div class="row2">
           <button class="btn" id="previewBtn" onclick="togglePreview()" style="flex:1">▶ Preview</button>
@@ -1587,9 +1600,20 @@ const ANIM_PARAMS = [
   { label: 'Text gap Y',      id: 'txtGapY',      min: 0,    max: 60   },
 ];
 
-let animFps      = 30;
-let previewRaf   = null;
+let animFps       = 30;
+let animEase      = 'inout';
+let previewRaf    = null;
 let previewActive = false;
+
+function applyEase(t) {
+  // Cubic easing applied to the ping-pong phase (0→1→0)
+  switch (animEase) {
+    case 'in':     return t * t * t;
+    case 'out':    return 1 - Math.pow(1 - t, 3);
+    case 'inout':  return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+    default:       return t; // linear
+  }
+}
 
 // Populate animParam select from ANIM_PARAMS
 (function initAnimSelect() {
@@ -1628,7 +1652,7 @@ function startPreview() {
     if (!t0) t0 = ts;
     const cycle = (ts - t0) % (duration * 2);
     const ph    = cycle < duration ? cycle / duration : 2 - cycle / duration;
-    const val   = fromVal + easeInOut(ph) * (toVal - fromVal);
+    const val   = fromVal + applyEase(ph) * (toVal - fromVal);
     param.value = val;
     if ($('v-' + paramId)) $('v-' + paramId).textContent = parseFloat(val).toFixed(2);
     $('svg-container').innerHTML = buildSVG();
@@ -1678,6 +1702,9 @@ async function startExportMP4() {
     catch { alert('Failed to load mp4-muxer. Check your internet connection.'); hideAnimProgress(); return; }
   }
 
+  const forceHD  = cb('exportFullHD');
+  const origCanW = $('canvasW').value, origCanH = $('canvasH').value;
+  if (forceHD) { $('canvasW').value = 1920; $('canvasH').value = 1080; }
   const W = fv('canvasW'), H = fv('canvasH');
   const encW = W % 2 === 0 ? W : W - 1;
   const encH = H % 2 === 0 ? H : H - 1;
@@ -1727,7 +1754,7 @@ async function startExportMP4() {
       if (encoderError) throw encoderError;
       const t   = total > 1 ? i / (total - 1) : 0;  // 0→1
       const ph  = t < 0.5 ? t * 2 : 2 - t * 2;      // ping-pong 0→1→0
-      const val = fromVal + easeInOut(ph) * (toVal - fromVal);
+      const val = fromVal + applyEase(ph) * (toVal - fromVal);
 
       param.value = val;
       if ($('v-' + paramId)) $('v-' + paramId).textContent = parseFloat(val).toFixed(2);
@@ -1764,6 +1791,7 @@ async function startExportMP4() {
   } finally {
     param.value = origVal;
     if ($('v-' + paramId)) $('v-' + paramId).textContent = origVal;
+    if (forceHD) { $('canvasW').value = origCanW; $('canvasH').value = origCanH; }
     update();
   }
 }
@@ -1775,6 +1803,12 @@ function setAnimProgress(frac, label) {
 }
 function hideAnimProgress() { $('anim-progress').style.display = 'none'; }
 
+$('ease-chips').addEventListener('click', e => {
+  const c = e.target.closest('.chip');
+  if (!c) return;
+  animEase = c.dataset.ease;
+  document.querySelectorAll('#ease-chips .chip').forEach(ch => ch.classList.toggle('active', ch === c));
+});
 $('fps-chips').addEventListener('click', e => {
   const c = e.target.closest('.chip');
   if (!c) return;

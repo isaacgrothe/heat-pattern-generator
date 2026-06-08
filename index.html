@@ -878,6 +878,14 @@ input[type="color"] {
           <div class="chip" data-fps="60">60</div>
         </div>
       </div>
+      <div class="ctrl">
+        <div class="ctrl-label"><span>Quality</span></div>
+        <div class="chips" id="quality-chips" style="margin-bottom:0">
+          <div class="chip" data-mbps="16">Good</div>
+          <div class="chip active" data-mbps="40">Great</div>
+          <div class="chip" data-mbps="80">Best</div>
+        </div>
+      </div>
       <label class="check-row">
         <input type="checkbox" id="exportFullHD" checked>
         <span>Force 1920×1080 output</span>
@@ -1602,6 +1610,7 @@ const ANIM_PARAMS = [
 
 let animFps       = 30;
 let animEase      = 'inout';
+let animMbps      = 40;
 let previewRaf    = null;
 let previewActive = false;
 
@@ -1730,7 +1739,7 @@ async function startExportMP4() {
     let chosenCodec = null;
     for (const c of codecCandidates) {
       try {
-        const { supported } = await VideoEncoder.isConfigSupported({ codec: c, width: encW, height: encH, bitrate: 8_000_000, framerate: fps });
+        const { supported } = await VideoEncoder.isConfigSupported({ codec: c, width: encW, height: encH, bitrate: animMbps * 1_000_000, framerate: fps });
         if (supported) { chosenCodec = c; break; }
       } catch {}
     }
@@ -1745,7 +1754,7 @@ async function startExportMP4() {
       output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
       error: e => { encoderError = e; },
     });
-    encoder.configure({ codec: chosenCodec, width: encW, height: encH, bitrate: 8_000_000, framerate: fps });
+    encoder.configure({ codec: chosenCodec, width: encW, height: encH, bitrate: animMbps * 1_000_000, framerate: fps, latencyMode: 'quality' });
 
     const canvas = document.createElement('canvas');
     canvas.width = encW; canvas.height = encH;
@@ -1803,6 +1812,12 @@ function setAnimProgress(frac, label) {
 }
 function hideAnimProgress() { $('anim-progress').style.display = 'none'; }
 
+$('quality-chips').addEventListener('click', e => {
+  const c = e.target.closest('.chip');
+  if (!c) return;
+  animMbps = parseInt(c.dataset.mbps);
+  document.querySelectorAll('#quality-chips .chip').forEach(ch => ch.classList.toggle('active', ch === c));
+});
 $('ease-chips').addEventListener('click', e => {
   const c = e.target.closest('.chip');
   if (!c) return;

@@ -1690,20 +1690,41 @@ async function startExportMP4() {
   const origVal = param.value;
 
   try {
+    // Auto-detect the highest H.264 profile/level the browser supports at this resolution
+    const codecCandidates = [
+      'avc1.640034', // High L5.2  (4K+)
+      'avc1.64002a', // High L4.2  (2K)
+      'avc1.640028', // High L4.0  (1080p)
+      'avc1.4d002a', // Main L4.2
+      'avc1.4d0028', // Main L4.0
+      'avc1.42002a', // Baseline L4.2
+      'avc1.420028', // Baseline L4.0
+    ];
+    let chosenCodec = null;
+    for (const c of codecCandidates) {
+      try {
+        const { supported } = await VideoEncoder.isConfigSupported({ codec: c, width: encW, height: encH, bitrate: 8_000_000, framerate: fps });
+        if (supported) { chosenCodec = c; break; }
+      } catch {}
+    }
+    if (!chosenCodec) throw new Error('No supported H.264 codec found for this resolution.');
+
     const { Muxer, ArrayBufferTarget } = Mp4Muxer;
     const target = new ArrayBufferTarget();
     const muxer  = new Muxer({ target, video: { codec: 'avc', width: encW, height: encH }, fastStart: 'in-memory' });
 
+    let encoderError = null;
     const encoder = new VideoEncoder({
       output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-      error: e => { throw e; },
+      error: e => { encoderError = e; },
     });
-    encoder.configure({ codec: 'avc1.42001f', width: encW, height: encH, bitrate: 8_000_000, framerate: fps });
+    encoder.configure({ codec: chosenCodec, width: encW, height: encH, bitrate: 8_000_000, framerate: fps });
 
     const canvas = document.createElement('canvas');
     canvas.width = encW; canvas.height = encH;
 
     for (let i = 0; i < total; i++) {
+      if (encoderError) throw encoderError;
       const t   = total > 1 ? i / (total - 1) : 0;  // 0→1
       const ph  = t < 0.5 ? t * 2 : 2 - t * 2;      // ping-pong 0→1→0
       const val = fromVal + easeInOut(ph) * (toVal - fromVal);

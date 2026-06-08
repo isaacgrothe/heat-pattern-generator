@@ -280,6 +280,32 @@ input[type="color"] {
   transition: color 0.1s, border-color 0.1s;
 }
 .del-btn:hover { color: #e06060; border-color: #804040; }
+
+/* ── Gallery ──────────────────────────────────────────────────────────── */
+.gallery-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gallery-item {
+  position: relative; cursor: pointer;
+  border-radius: 6px; border: 1px solid #2c2c2c;
+  overflow: hidden; background: #0e0e0e;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.gallery-item:hover { border-color: #555; box-shadow: 0 0 0 1px #555; }
+.gallery-thumb { width: 100%; height: 68px; object-fit: cover; display: block; }
+.gallery-footer {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 5px 4px; background: #181818;
+}
+.gallery-name {
+  font-size: 10px; color: #777; flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gallery-act {
+  background: none; border: none; color: #444; cursor: pointer;
+  font-size: 12px; padding: 1px 3px; line-height: 1; flex-shrink: 0;
+  border-radius: 3px;
+}
+.gallery-act:hover { color: #ccc; background: #2a2a2a; }
+.gallery-act.del:hover { color: #e06060; }
 </style>
 </head>
 <body>
@@ -799,6 +825,17 @@ input[type="color"] {
       </div>
     </div>
   </div>
+
+  <!-- ── GALLERY ────────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title" onclick="toggleSection(this)">
+      Gallery <span class="chevron">▾</span>
+    </div>
+    <div class="section-body" style="padding:10px 12px 14px">
+      <div id="gallery-grid" class="gallery-grid"></div>
+      <div id="gallery-empty" style="color:#444;font-size:11px;text-align:center;padding:14px 0">No saved patterns yet — hit ⊕ Save</div>
+    </div>
+  </div>
 </div>
 
 <!-- ── Preview ──────────────────────────────────────────────────────────── -->
@@ -809,6 +846,7 @@ input[type="color"] {
   <div id="export-bar">
     <button class="btn primary" onclick="exportSVG()">Export SVG</button>
     <button class="btn" id="copyBtn" onclick="copySVG()">Copy SVG</button>
+    <button class="btn" onclick="savePattern()" style="margin-left:auto">⊕ Save</button>
   </div>
 </div>
 
@@ -1462,7 +1500,138 @@ $('textMode-chips').addEventListener('click', e => {
 
 window.addEventListener('resize', scalePreview);
 
+// ── Gallery ────────────────────────────────────────────────────────────────
+let gallery = [];
+let _saveN  = 0;
+try {
+  gallery = JSON.parse(localStorage.getItem('hpg-gallery') || '[]');
+  _saveN  = +localStorage.getItem('hpg-n') || 0;
+} catch(e) {}
+
+function persistGallery() {
+  try {
+    localStorage.setItem('hpg-gallery', JSON.stringify(gallery));
+    localStorage.setItem('hpg-n', _saveN);
+  } catch(e) { alert('localStorage full — delete some saves first.'); }
+}
+
+function captureSnapshot() {
+  const inputs = {};
+  document.querySelectorAll('#sidebar input, #sidebar select').forEach(el => {
+    if (el.id) inputs[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+  });
+  return {
+    id:        Date.now(),
+    name:      `Save ${++_saveN}`,
+    inputs,
+    appState:  { ...S },
+    gradStops: gradStops.map(s => ({ ...s })),
+    altColors: [...altColors],
+    svg:       buildSVG()
+  };
+}
+
+function savePattern() {
+  gallery.unshift(captureSnapshot());
+  persistGallery();
+  renderGallery();
+  // Open and scroll to gallery section
+  const sec = $('gallery-grid').closest('.section');
+  if (sec.classList.contains('collapsed')) sec.classList.remove('collapsed');
+  setTimeout(() => $('gallery-grid').scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+}
+
+function loadPattern(id) {
+  const snap = gallery.find(s => s.id === id);
+  if (!snap) return;
+
+  // Restore all inputs
+  Object.entries(snap.inputs).forEach(([elId, val]) => {
+    const el = $(elId);
+    if (!el) return;
+    if (el.type === 'checkbox') el.checked = (val === true || val === 'true');
+    else el.value = val;
+    if ($('v-' + elId)) $('v-' + elId).textContent = val;
+  });
+
+  // Restore app state
+  Object.assign(S, snap.appState);
+
+  // Restore gradient stops
+  gradStops = snap.gradStops.map(s => ({ ...s }));
+  nextId = Math.max(...gradStops.map(s => s.id)) + 1;
+  selId  = gradStops[0]?.id ?? null;
+
+  // Restore alternating colors
+  altColors = [...snap.altColors];
+
+  // Rebuild chip UI states
+  setPattern(S.pattern);
+  setSymmetry(S.sym);
+  setFillMode(S.fillMode);
+
+  [
+    ['#burst-corner-chips .chip', 'corner',  'burstCorner'],
+    ['#txtWeight-chips .chip',    'tw',       'txtWeight'],
+    ['#txtMode-chips .chip',      'tm',       'txtMode'],
+    ['#textWeight-chips .chip',   'w',        'textWeight'],
+    ['#textMode-chips .chip',     'm',        'textMode'],
+    ['#textStyle-chips .chip',    'fs',       'textStyle'],
+  ].forEach(([sel, attr, key]) => {
+    document.querySelectorAll(sel).forEach(c =>
+      c.classList.toggle('active', c.dataset[attr] === S[key]));
+  });
+
+  // Sync dependent UI
+  const sq = $('squareTiles').checked;
+  $('tileH').disabled = sq;
+  $('tileH').style.opacity = sq ? '0.35' : '1';
+  $('text-mask-ctrl').style.display = $('textMaskEnabled').checked ? 'block' : 'none';
+  $('sym-n-ctrl').style.display = S.sym === 'R' ? 'block' : 'none';
+
+  renderGradEditor();
+  renderAltColors();
+  update();
+}
+
+function deletePattern(id) {
+  gallery = gallery.filter(s => s.id !== id);
+  persistGallery();
+  renderGallery();
+}
+
+function renamePattern(id) {
+  const snap = gallery.find(s => s.id === id);
+  if (!snap) return;
+  const name = prompt('Rename:', snap.name);
+  if (name !== null && name.trim()) { snap.name = name.trim(); persistGallery(); renderGallery(); }
+}
+
+function renderGallery() {
+  const grid  = $('gallery-grid');
+  const empty = $('gallery-empty');
+  if (!gallery.length) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  grid.innerHTML = gallery.map(snap => {
+    const uri = 'data:image/svg+xml,' + encodeURIComponent(snap.svg);
+    return `
+      <div class="gallery-item" onclick="loadPattern(${snap.id})">
+        <img class="gallery-thumb" src="${uri}" alt="">
+        <div class="gallery-footer">
+          <span class="gallery-name">${snap.name}</span>
+          <button class="gallery-act" onclick="event.stopPropagation();renamePattern(${snap.id})" title="Rename">✎</button>
+          <button class="gallery-act del" onclick="event.stopPropagation();deletePattern(${snap.id})" title="Delete">✕</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
+renderGallery();
 renderGradEditor();
 renderAltColors();
 update();

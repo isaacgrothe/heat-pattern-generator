@@ -381,6 +381,10 @@ input[type="color"] {
         <div class="chip" data-p="wave">Wave</div>
         <div class="chip" data-p="scatter">Scatter</div>
         <div class="chip" data-p="burst">Burst</div>
+        <div class="chip" data-p="sunflower">Sunflower</div>
+        <div class="chip" data-p="hex">Hex</div>
+        <div class="chip" data-p="rings">Rings</div>
+        <div class="chip" data-p="lines">Lines</div>
         <div class="chip" data-p="text">Text</div>
       </div>
 
@@ -613,6 +617,102 @@ input[type="color"] {
           <div class="ctrl-label"><span>Y offset</span><span class="ctrl-value" id="v-txtOffY">0</span></div>
           <input type="range" id="txtOffY" min="-800" max="800" value="0" oninput="sv('txtOffY');update()">
         </div>
+      </div>
+
+      <!-- Sunflower -->
+      <div class="param-group" id="pg-sunflower">
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Count</span><span class="ctrl-value" id="v-sfCount">300</span></div>
+          <input type="range" id="sfCount" min="10" max="2000" value="300" oninput="sv('sfCount');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Spread</span><span class="ctrl-value" id="v-sfSpread">200</span></div>
+          <input type="range" id="sfSpread" min="10" max="800" value="200" oninput="sv('sfSpread');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Min radius</span><span class="ctrl-value" id="v-sfMinR">0</span></div>
+          <input type="range" id="sfMinR" min="0" max="500" value="0" oninput="sv('sfMinR');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Size taper</span><span class="ctrl-value" id="v-sfTaper">1.00</span></div>
+          <input type="range" id="sfTaper" min="0" max="3" step="0.05" value="1" oninput="sv('sfTaper');update()">
+        </div>
+        <label class="check-row">
+          <input type="checkbox" id="sfFollow" checked onchange="update()">
+          <span>Rotate tiles outward</span>
+        </label>
+      </div>
+
+      <!-- Hex -->
+      <div class="param-group" id="pg-hex">
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Columns</span><span class="ctrl-value" id="v-hexCols">12</span></div>
+          <input type="range" id="hexCols" min="2" max="60" value="12" oninput="sv('hexCols');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Rows</span><span class="ctrl-value" id="v-hexRows">8</span></div>
+          <input type="range" id="hexRows" min="2" max="60" value="8" oninput="sv('hexRows');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Gap X</span><span class="ctrl-value" id="v-hexGapX">4</span></div>
+          <input type="range" id="hexGapX" min="0" max="80" value="4" oninput="sv('hexGapX');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Gap Y</span><span class="ctrl-value" id="v-hexGapY">4</span></div>
+          <input type="range" id="hexGapY" min="0" max="80" value="4" oninput="sv('hexGapY');update()">
+        </div>
+      </div>
+
+      <!-- Rings -->
+      <div class="param-group" id="pg-rings">
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Ring count</span><span class="ctrl-value" id="v-ringsCount">6</span></div>
+          <input type="range" id="ringsCount" min="1" max="30" value="6" oninput="sv('ringsCount');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Min radius</span><span class="ctrl-value" id="v-ringsMinR">40</span></div>
+          <input type="range" id="ringsMinR" min="0" max="600" value="40" oninput="sv('ringsMinR');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Max radius</span><span class="ctrl-value" id="v-ringsMaxR">400</span></div>
+          <input type="range" id="ringsMaxR" min="10" max="1200" value="400" oninput="sv('ringsMaxR');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Tile gap</span><span class="ctrl-value" id="v-ringsGap">6</span></div>
+          <input type="range" id="ringsGap" min="0" max="80" value="6" oninput="sv('ringsGap');update()">
+        </div>
+        <label class="check-row">
+          <input type="checkbox" id="ringsFollow" checked onchange="update()">
+          <span>Rotate tiles tangentially</span>
+        </label>
+      </div>
+
+      <!-- Lines -->
+      <div class="param-group" id="pg-lines">
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Angle</span><span class="ctrl-value" id="v-linesAngle">45</span></div>
+          <input type="range" id="linesAngle" min="-90" max="90" value="45" oninput="sv('linesAngle');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Line count</span><span class="ctrl-value" id="v-linesCount">12</span></div>
+          <input type="range" id="linesCount" min="1" max="60" value="12" oninput="sv('linesCount');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Tiles per line</span><span class="ctrl-value" id="v-linesTiles">20</span></div>
+          <input type="range" id="linesTiles" min="1" max="120" value="20" oninput="sv('linesTiles');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Line spacing</span><span class="ctrl-value" id="v-linesSpacing">60</span></div>
+          <input type="range" id="linesSpacing" min="10" max="300" value="60" oninput="sv('linesSpacing');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Tile gap</span><span class="ctrl-value" id="v-linesGap">4</span></div>
+          <input type="range" id="linesGap" min="0" max="80" value="4" oninput="sv('linesGap');update()">
+        </div>
+        <label class="check-row">
+          <input type="checkbox" id="linesFollow" checked onchange="update()">
+          <span>Rotate tiles along line</span>
+        </label>
       </div>
     </div>
   </div>
@@ -1149,6 +1249,104 @@ function genText(rng, W, H) {
   return tiles;
 }
 
+function genSunflower(rng, W, H) {
+  const count  = iv('sfCount');
+  const spread = fv('sfSpread');
+  const minR   = fv('sfMinR');
+  const taper  = fv('sfTaper');
+  const follow = cb('sfFollow');
+  const tw     = fv('tileW'), th = fv('tileH');
+  const cx0    = W / 2, cy0 = H / 2;
+  const golden = Math.PI * (3 - Math.sqrt(5)); // ≈ 137.508°
+  const tiles  = [];
+  for (let i = 0; i < count; i++) {
+    const r     = Math.sqrt(i / count) * spread + minR;
+    const angle = i * golden;
+    const px    = cx0 + r * Math.cos(angle);
+    const py    = cy0 + r * Math.sin(angle);
+    const sf    = taper > 0 ? Math.pow((i + 1) / count, taper / 3) : 1;
+    const rot   = follow ? angle * 180 / Math.PI : 0;
+    tiles.push({ cx: px, cy: py, w: tw * sf, h: th * sf, rot });
+  }
+  return tiles;
+}
+
+function genHex(rng, W, H) {
+  const cols  = iv('hexCols');
+  const rows  = iv('hexRows');
+  const gx    = fv('hexGapX');
+  const gy    = fv('hexGapY');
+  const tw    = fv('tileW'), th = fv('tileH');
+  const cellW = tw + gx;
+  const cellH = (th + gy) * 0.866;
+  const totalW = (cols - 0.5) * cellW;
+  const totalH = (rows - 1) * cellH * 2 + th;
+  const offX  = (W - totalW) / 2 + cellW / 2;
+  const offY  = (H - totalH) / 2 + th / 2;
+  const tiles = [];
+  for (let r = 0; r < rows; r++) {
+    const stagger = (r % 2) * cellW * 0.5;
+    for (let c = 0; c < cols; c++) {
+      const px = offX + c * cellW + stagger;
+      const py = offY + r * cellH * 2;
+      tiles.push({ cx: px, cy: py, w: tw, h: th, rot: 0 });
+    }
+  }
+  return tiles;
+}
+
+function genRings(rng, W, H) {
+  const n      = iv('ringsCount');
+  const minR   = fv('ringsMinR');
+  const maxR   = fv('ringsMaxR');
+  const gap    = fv('ringsGap');
+  const follow = cb('ringsFollow');
+  const tw     = fv('tileW'), th = fv('tileH');
+  const cx0    = W / 2, cy0 = H / 2;
+  const tiles  = [];
+  for (let i = 0; i < n; i++) {
+    const r      = n === 1 ? minR : minR + (maxR - minR) * (i / (n - 1));
+    const circum = 2 * Math.PI * Math.max(r, 0.1);
+    const count  = Math.max(1, Math.round(circum / (Math.max(tw, th) + gap)));
+    for (let j = 0; j < count; j++) {
+      const angle = (j / count) * 2 * Math.PI;
+      const px    = cx0 + r * Math.cos(angle);
+      const py    = cy0 + r * Math.sin(angle);
+      const rot   = follow ? (angle * 180 / Math.PI + 90) : 0;
+      tiles.push({ cx: px, cy: py, w: tw, h: th, rot });
+    }
+  }
+  return tiles;
+}
+
+function genLines(rng, W, H) {
+  const angleDeg     = fv('linesAngle');
+  const lineCount    = iv('linesCount');
+  const tilesPerLine = iv('linesTiles');
+  const spacing      = fv('linesSpacing');
+  const gap          = fv('linesGap');
+  const follow       = cb('linesFollow');
+  const tw           = fv('tileW'), th = fv('tileH');
+  const rad          = angleDeg * Math.PI / 180;
+  const perp         = rad + Math.PI / 2;
+  const cx0          = W / 2, cy0 = H / 2;
+  const tileStep     = Math.max(tw, th) + gap;
+  const tiles        = [];
+  for (let l = 0; l < lineCount; l++) {
+    const offset = (l - (lineCount - 1) / 2) * spacing;
+    const lx     = cx0 + offset * Math.cos(perp);
+    const ly     = cy0 + offset * Math.sin(perp);
+    for (let t = 0; t < tilesPerLine; t++) {
+      const d  = (t - (tilesPerLine - 1) / 2) * tileStep;
+      const px = lx + d * Math.cos(rad);
+      const py = ly + d * Math.sin(rad);
+      const rot = follow ? angleDeg : 0;
+      tiles.push({ cx: px, cy: py, w: tw, h: th, rot });
+    }
+  }
+  return tiles;
+}
+
 function genScatter(rng, W, H) {
   const count = iv('scatterCount');
   const minS = fv('scatterMin'), maxS = fv('scatterMax');
@@ -1330,7 +1528,7 @@ function buildSVG() {
   const rng = mkRng(fv('seed') | 0);
 
   // Generate + transform tiles
-  const gens = { grid: genGrid, spiral: genSpiral, radial: genRadial, wave: genWave, scatter: genScatter, burst: genBurst, text: genText };
+  const gens = { grid: genGrid, spiral: genSpiral, radial: genRadial, wave: genWave, scatter: genScatter, burst: genBurst, text: genText, sunflower: genSunflower, hex: genHex, rings: genRings, lines: genLines };
   let tiles = gens[S.pattern](rng, W, H);
   tiles = tiles.map(t => ({ ...t, rot: t.rot + rotBase + (rng() - 0.5) * 2 * rotRand }));
   tiles = applySymmetry(tiles, S.sym, W, H);

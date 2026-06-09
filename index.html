@@ -868,11 +868,11 @@ input[type="color"] {
         </div>
         <div class="ctrl">
           <div class="ctrl-label"><span>Cell width</span><span class="ctrl-value" id="v-mirrorCellW">280</span></div>
-          <input type="range" id="mirrorCellW" min="20" max="1200" value="280" oninput="sv('mirrorCellW');update()">
+          <input type="range" id="mirrorCellW" min="20" max="3000" value="280" oninput="sv('mirrorCellW');update()">
         </div>
         <div class="ctrl">
           <div class="ctrl-label"><span>Cell height</span><span class="ctrl-value" id="v-mirrorCellH">200</span></div>
-          <input type="range" id="mirrorCellH" min="20" max="1200" value="200" oninput="sv('mirrorCellH');update()">
+          <input type="range" id="mirrorCellH" min="20" max="3000" value="200" oninput="sv('mirrorCellH');update()">
         </div>
         <div class="ctrl">
           <div class="ctrl-label"><span>Twist (°)</span><span class="ctrl-value" id="v-mirrorTwist">0</span></div>
@@ -1672,9 +1672,9 @@ function genMirror(rng, W, H) {
   const stepY  = H / rows;
   const tiles  = [];
 
-  // Mirror-fold v into [0, period], creating seamless reflection
-  function fold(v, period) {
-    const t = ((v % (2 * period)) + 2 * period) % (2 * period);
+  // Mirror-fold a positive distance into [0, period]
+  function fold(d, period) {
+    const t = (d % (2 * period) + 2 * period) % (2 * period);
     return t < period ? t : 2 * period - t;
   }
 
@@ -1683,9 +1683,11 @@ function genMirror(rng, W, H) {
       const px = (c + 0.5) * stepX;
       const py = (r + 0.5) * stepY;
 
-      // Local position within mirrored cell (centred at 0)
-      const lx = fold(px, cellW) - cellW / 2;
-      const ly = fold(py, cellH) - cellH / 2;
+      // Fold from canvas centre: cellW = W/2 → exactly 1 cell, W/4 → 2 cells, etc.
+      const dx = px - W / 2;
+      const dy = py - H / 2;
+      const lx = fold(Math.abs(dx), cellW) * Math.sign(dx || 1);
+      const ly = fold(Math.abs(dy), cellH) * Math.sign(dy || 1);
 
       // Radial angle from cell centre + twist offset
       const angle = Math.atan2(ly, lx) + twist;
@@ -2167,8 +2169,8 @@ const ANIM_PARAMS = [
   { label: 'Persp min dist', id: 'perspMinD',    min: 0,    max: 600  },
   { label: 'Persp max dist', id: 'perspMaxD',    min: 100,  max: 3000 },
   { label: 'Persp direction',id: 'perspDir',     min: 0,    max: 360  },
-  { label: 'Mirror cell W',  id: 'mirrorCellW',  min: 20,   max: 1200 },
-  { label: 'Mirror cell H',  id: 'mirrorCellH',  min: 20,   max: 1200 },
+  { label: 'Mirror cell W',  id: 'mirrorCellW',  min: 20,   max: 3000 },
+  { label: 'Mirror cell H',  id: 'mirrorCellH',  min: 20,   max: 3000 },
   { label: 'Mirror twist',   id: 'mirrorTwist',  min: -180, max: 180  },
 ];
 

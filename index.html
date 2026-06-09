@@ -386,6 +386,7 @@ input[type="color"] {
         <div class="chip" data-p="rings">Rings</div>
         <div class="chip" data-p="lines">Lines</div>
         <div class="chip" data-p="star">Star</div>
+        <div class="chip" data-p="flow">Flow</div>
         <div class="chip" data-p="text">Text</div>
       </div>
 
@@ -775,6 +776,34 @@ input[type="color"] {
           <input type="checkbox" id="starStagger" onchange="update()">
           <span>Stagger rows</span>
         </label>
+      </div>
+
+      <!-- Flow field -->
+      <div class="param-group" id="pg-flow">
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Columns</span><span class="ctrl-value" id="v-flowCols">28</span></div>
+          <input type="range" id="flowCols" min="2" max="120" value="28" oninput="sv('flowCols');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Rows</span><span class="ctrl-value" id="v-flowRows">16</span></div>
+          <input type="range" id="flowRows" min="2" max="80" value="16" oninput="sv('flowRows');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Feature size</span><span class="ctrl-value" id="v-flowScale">300</span></div>
+          <input type="range" id="flowScale" min="30" max="1200" value="300" oninput="sv('flowScale');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Octaves</span><span class="ctrl-value" id="v-flowOctaves">3</span></div>
+          <input type="range" id="flowOctaves" min="1" max="6" value="3" oninput="sv('flowOctaves');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Strength</span><span class="ctrl-value" id="v-flowStrength">1.00</span></div>
+          <input type="range" id="flowStrength" min="0" max="4" step="0.05" value="1" oninput="sv('flowStrength');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Base angle</span><span class="ctrl-value" id="v-flowBase">0</span></div>
+          <input type="range" id="flowBase" min="-180" max="180" value="0" oninput="sv('flowBase');update()">
+        </div>
       </div>
     </div>
   </div>
@@ -1482,6 +1511,43 @@ function genStar(rng, W, H) {
   return tiles;
 }
 
+function genFlow(rng, W, H) {
+  const cols     = iv('flowCols');
+  const rows     = iv('flowRows');
+  const scale    = fv('flowScale');
+  const octaves  = iv('flowOctaves');
+  const strength = fv('flowStrength');
+  const base     = fv('flowBase') * Math.PI / 180;
+  const tw       = fv('tileW'), th = fv('tileH');
+  const seedVal  = fv('seed') * 0.0013;
+  const freq0    = 1 / Math.max(scale, 1);
+  const cellW    = W / cols;
+  const cellH    = H / rows;
+  const tiles    = [];
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const px = (c + 0.5) * cellW;
+      const py = (r + 0.5) * cellH;
+
+      // Multi-octave trig noise → smooth angle field
+      let vx = 0, vy = 0, amp = 1, freq = freq0;
+      for (let o = 0; o < octaves; o++) {
+        const s = seedVal + o * 1.6180339;
+        vx += amp * Math.sin(px * freq + Math.cos(py * freq * 0.71 + s * 2.13) + s);
+        vy += amp * Math.cos(py * freq + Math.sin(px * freq * 0.83 + s * 1.37) + s * 0.79);
+        amp  *= 0.5;
+        freq *= 2.07;
+      }
+
+      const noiseAngle = Math.atan2(vy, vx);
+      const rot = (base + noiseAngle * strength) * 180 / Math.PI;
+      tiles.push({ cx: px, cy: py, w: tw, h: th, rot });
+    }
+  }
+  return tiles;
+}
+
 function genScatter(rng, W, H) {
   const count = iv('scatterCount');
   const minS = fv('scatterMin'), maxS = fv('scatterMax');
@@ -1663,7 +1729,7 @@ function buildSVG() {
   const rng = mkRng(fv('seed') | 0);
 
   // Generate + transform tiles
-  const gens = { grid: genGrid, spiral: genSpiral, radial: genRadial, wave: genWave, scatter: genScatter, burst: genBurst, text: genText, sunflower: genSunflower, hex: genHex, rings: genRings, lines: genLines, star: genStar };
+  const gens = { grid: genGrid, spiral: genSpiral, radial: genRadial, wave: genWave, scatter: genScatter, burst: genBurst, text: genText, sunflower: genSunflower, hex: genHex, rings: genRings, lines: genLines, star: genStar, flow: genFlow };
   let tiles = gens[S.pattern](rng, W, H);
   tiles = tiles.map(t => ({ ...t, rot: t.rot + rotBase + (rng() - 0.5) * 2 * rotRand }));
   tiles = applySymmetry(tiles, S.sym, W, H);
@@ -1940,6 +2006,9 @@ const ANIM_PARAMS = [
   { label: 'Text Y offset',   id: 'txtOffY',      min: -800, max: 800  },
   { label: 'Text gap X',      id: 'txtGapX',      min: 0,    max: 60   },
   { label: 'Text gap Y',      id: 'txtGapY',      min: 0,    max: 60   },
+  { label: 'Flow feature size', id: 'flowScale',  min: 30,   max: 1200 },
+  { label: 'Flow strength',   id: 'flowStrength', min: 0,    max: 4    },
+  { label: 'Flow base angle', id: 'flowBase',     min: -180, max: 180  },
 ];
 
 let animFps       = 30;

@@ -385,6 +385,7 @@ input[type="color"] {
         <div class="chip" data-p="hex">Hex</div>
         <div class="chip" data-p="rings">Rings</div>
         <div class="chip" data-p="lines">Lines</div>
+        <div class="chip" data-p="star">Star</div>
         <div class="chip" data-p="text">Text</div>
       </div>
 
@@ -717,6 +718,34 @@ input[type="color"] {
         <label class="check-row">
           <input type="checkbox" id="linesFollow" checked onchange="update()">
           <span>Rotate tiles along line</span>
+        </label>
+      </div>
+
+      <!-- Star -->
+      <div class="param-group" id="pg-star">
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Points</span><span class="ctrl-value" id="v-starPoints">5</span></div>
+          <input type="range" id="starPoints" min="3" max="16" value="5" oninput="sv('starPoints');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Size</span><span class="ctrl-value" id="v-starOuterR">220</span></div>
+          <input type="range" id="starOuterR" min="30" max="900" value="220" oninput="sv('starOuterR');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Inner ratio</span><span class="ctrl-value" id="v-starInnerRatio">0.45</span></div>
+          <input type="range" id="starInnerRatio" min="0.1" max="0.95" step="0.01" value="0.45" oninput="sv('starInnerRatio');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Tiles per edge</span><span class="ctrl-value" id="v-starTiles">8</span></div>
+          <input type="range" id="starTiles" min="1" max="60" value="8" oninput="sv('starTiles');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Tile gap</span><span class="ctrl-value" id="v-starGap">4</span></div>
+          <input type="range" id="starGap" min="0" max="80" value="4" oninput="sv('starGap');update()">
+        </div>
+        <label class="check-row">
+          <input type="checkbox" id="starFollow" checked onchange="update()">
+          <span>Rotate tiles along edge</span>
         </label>
       </div>
     </div>
@@ -1353,6 +1382,43 @@ function genLines(rng, W, H) {
   return tiles;
 }
 
+function genStar(rng, W, H) {
+  const points     = iv('starPoints');
+  const outerR     = fv('starOuterR');
+  const innerRatio = fv('starInnerRatio');
+  const tilesPerEdge = iv('starTiles');
+  const gap        = fv('starGap');
+  const follow     = cb('starFollow');
+  const tw         = fv('tileW'), th = fv('tileH');
+  const cx0        = W / 2, cy0 = H / 2;
+  const innerR     = outerR * innerRatio;
+  const totalVerts = points * 2;
+  const tiles      = [];
+
+  // Build alternating outer/inner vertices
+  const verts = [];
+  for (let i = 0; i < totalVerts; i++) {
+    const angle = (i / totalVerts) * 2 * Math.PI - Math.PI / 2;
+    const r     = (i % 2 === 0) ? outerR : innerR;
+    verts.push({ x: cx0 + r * Math.cos(angle), y: cy0 + r * Math.sin(angle) });
+  }
+
+  // Place tiles along each edge
+  for (let i = 0; i < totalVerts; i++) {
+    const a  = verts[i];
+    const b  = verts[(i + 1) % totalVerts];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const edgeAngleDeg = Math.atan2(dy, dx) * 180 / Math.PI;
+    for (let t = 0; t < tilesPerEdge; t++) {
+      const f  = (t + 0.5) / tilesPerEdge;
+      const px = a.x + f * dx;
+      const py = a.y + f * dy;
+      tiles.push({ cx: px, cy: py, w: tw, h: th, rot: follow ? edgeAngleDeg : 0 });
+    }
+  }
+  return tiles;
+}
+
 function genScatter(rng, W, H) {
   const count = iv('scatterCount');
   const minS = fv('scatterMin'), maxS = fv('scatterMax');
@@ -1534,7 +1600,7 @@ function buildSVG() {
   const rng = mkRng(fv('seed') | 0);
 
   // Generate + transform tiles
-  const gens = { grid: genGrid, spiral: genSpiral, radial: genRadial, wave: genWave, scatter: genScatter, burst: genBurst, text: genText, sunflower: genSunflower, hex: genHex, rings: genRings, lines: genLines };
+  const gens = { grid: genGrid, spiral: genSpiral, radial: genRadial, wave: genWave, scatter: genScatter, burst: genBurst, text: genText, sunflower: genSunflower, hex: genHex, rings: genRings, lines: genLines, star: genStar };
   let tiles = gens[S.pattern](rng, W, H);
   tiles = tiles.map(t => ({ ...t, rot: t.rot + rotBase + (rng() - 0.5) * 2 * rotRand }));
   tiles = applySymmetry(tiles, S.sym, W, H);

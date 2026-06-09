@@ -387,6 +387,7 @@ input[type="color"] {
         <div class="chip" data-p="lines">Lines</div>
         <div class="chip" data-p="star">Star</div>
         <div class="chip" data-p="flow">Flow</div>
+        <div class="chip" data-p="persp">Perspective</div>
         <div class="chip" data-p="text">Text</div>
       </div>
 
@@ -804,6 +805,54 @@ input[type="color"] {
           <div class="ctrl-label"><span>Base angle</span><span class="ctrl-value" id="v-flowBase">0</span></div>
           <input type="range" id="flowBase" min="-180" max="180" value="0" oninput="sv('flowBase');update()">
         </div>
+      </div>
+
+      <!-- Perspective -->
+      <div class="param-group" id="pg-persp">
+        <div class="ctrl">
+          <div class="ctrl-label"><span>VP X (%)</span><span class="ctrl-value" id="v-perspVPX">50</span></div>
+          <input type="range" id="perspVPX" min="-20" max="120" value="50" oninput="sv('perspVPX');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>VP Y (%)</span><span class="ctrl-value" id="v-perspVPY">-5</span></div>
+          <input type="range" id="perspVPY" min="-80" max="180" value="-5" oninput="sv('perspVPY');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Rays</span><span class="ctrl-value" id="v-perspRays">14</span></div>
+          <input type="range" id="perspRays" min="2" max="60" value="14" oninput="sv('perspRays');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Rings</span><span class="ctrl-value" id="v-perspRings">12</span></div>
+          <input type="range" id="perspRings" min="1" max="40" value="12" oninput="sv('perspRings');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Arc (°)</span><span class="ctrl-value" id="v-perspArc">140</span></div>
+          <input type="range" id="perspArc" min="5" max="360" value="140" oninput="sv('perspArc');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Direction (°)</span><span class="ctrl-value" id="v-perspDir">90</span></div>
+          <input type="range" id="perspDir" min="0" max="360" value="90" oninput="sv('perspDir');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Min dist</span><span class="ctrl-value" id="v-perspMinD">80</span></div>
+          <input type="range" id="perspMinD" min="0" max="600" value="80" oninput="sv('perspMinD');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Max dist</span><span class="ctrl-value" id="v-perspMaxD">1100</span></div>
+          <input type="range" id="perspMaxD" min="100" max="3000" value="1100" oninput="sv('perspMaxD');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Compression</span><span class="ctrl-value" id="v-perspPow">2.00</span></div>
+          <input type="range" id="perspPow" min="0.5" max="5" step="0.05" value="2" oninput="sv('perspPow');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Size taper</span><span class="ctrl-value" id="v-perspTaper">1.00</span></div>
+          <input type="range" id="perspTaper" min="0" max="3" step="0.05" value="1" oninput="sv('perspTaper');update()">
+        </div>
+        <label class="check-row">
+          <input type="checkbox" id="perspFollow" checked onchange="update()">
+          <span>Rotate tiles along ray</span>
+        </label>
       </div>
     </div>
   </div>
@@ -1548,6 +1597,40 @@ function genFlow(rng, W, H) {
   return tiles;
 }
 
+function genPersp(rng, W, H) {
+  const vpX    = fv('perspVPX') / 100 * W;
+  const vpY    = fv('perspVPY') / 100 * H;
+  const rays   = iv('perspRays');
+  const rings  = iv('perspRings');
+  const arcRad = fv('perspArc')  * Math.PI / 180;
+  const dirRad = fv('perspDir')  * Math.PI / 180;
+  const minD   = fv('perspMinD');
+  const maxD   = fv('perspMaxD');
+  const pow    = fv('perspPow');
+  const taper  = fv('perspTaper');
+  const follow = cb('perspFollow');
+  const tw     = fv('tileW'), th = fv('tileH');
+  const tiles  = [];
+
+  const startAngle = dirRad - arcRad / 2;
+  const angleStep  = rays > 1 ? arcRad / (rays - 1) : 0;
+
+  for (let ri = 0; ri < rings; ri++) {
+    const t    = rings > 1 ? ri / (rings - 1) : 1;
+    const dist = minD + (maxD - minD) * Math.pow(t, pow);
+    // Tiles grow larger away from VP (closer to viewer)
+    const sf   = Math.max(0.04, Math.pow(t, -taper * 0.6 + 1) );
+    for (let ray = 0; ray < rays; ray++) {
+      const angle = startAngle + ray * angleStep;
+      const px    = vpX + dist * Math.cos(angle);
+      const py    = vpY + dist * Math.sin(angle);
+      const rot   = follow ? angle * 180 / Math.PI : 0;
+      tiles.push({ cx: px, cy: py, w: tw * sf, h: th * sf, rot });
+    }
+  }
+  return tiles;
+}
+
 function genScatter(rng, W, H) {
   const count = iv('scatterCount');
   const minS = fv('scatterMin'), maxS = fv('scatterMax');
@@ -1729,7 +1812,7 @@ function buildSVG() {
   const rng = mkRng(fv('seed') | 0);
 
   // Generate + transform tiles
-  const gens = { grid: genGrid, spiral: genSpiral, radial: genRadial, wave: genWave, scatter: genScatter, burst: genBurst, text: genText, sunflower: genSunflower, hex: genHex, rings: genRings, lines: genLines, star: genStar, flow: genFlow };
+  const gens = { grid: genGrid, spiral: genSpiral, radial: genRadial, wave: genWave, scatter: genScatter, burst: genBurst, text: genText, sunflower: genSunflower, hex: genHex, rings: genRings, lines: genLines, star: genStar, flow: genFlow, persp: genPersp };
   let tiles = gens[S.pattern](rng, W, H);
   tiles = tiles.map(t => ({ ...t, rot: t.rot + rotBase + (rng() - 0.5) * 2 * rotRand }));
   tiles = applySymmetry(tiles, S.sym, W, H);
@@ -2009,6 +2092,11 @@ const ANIM_PARAMS = [
   { label: 'Flow feature size', id: 'flowScale',  min: 30,   max: 1200 },
   { label: 'Flow strength',   id: 'flowStrength', min: 0,    max: 4    },
   { label: 'Flow base angle', id: 'flowBase',     min: -180, max: 180  },
+  { label: 'Persp VP X',     id: 'perspVPX',     min: -20,  max: 120  },
+  { label: 'Persp VP Y',     id: 'perspVPY',     min: -80,  max: 180  },
+  { label: 'Persp min dist', id: 'perspMinD',    min: 0,    max: 600  },
+  { label: 'Persp max dist', id: 'perspMaxD',    min: 100,  max: 3000 },
+  { label: 'Persp direction',id: 'perspDir',     min: 0,    max: 360  },
 ];
 
 let animFps       = 30;

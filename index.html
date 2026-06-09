@@ -748,6 +748,22 @@ input[type="color"] {
           <span>Rotate tiles along edge</span>
         </label>
         <label class="check-row">
+          <input type="checkbox" id="starConcentric" onchange="update()">
+          <span>Concentric rings</span>
+        </label>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Ring count</span><span class="ctrl-value" id="v-starRings">5</span></div>
+          <input type="range" id="starRings" min="2" max="20" value="5" oninput="sv('starRings');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Min size</span><span class="ctrl-value" id="v-starMinR">40</span></div>
+          <input type="range" id="starMinR" min="10" max="800" value="40" oninput="sv('starMinR');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Taper</span><span class="ctrl-value" id="v-starTaper">0.50</span></div>
+          <input type="range" id="starTaper" min="-1" max="2" step="0.05" value="0.5" oninput="sv('starTaper');update()">
+        </div>
+        <label class="check-row">
           <input type="checkbox" id="starTile" onchange="update()">
           <span>Tile across canvas</span>
         </label>
@@ -1401,11 +1417,14 @@ function genStar(rng, W, H) {
   const tilesPerEdge = iv('starTiles');
   const gap          = fv('starGap');
   const follow       = cb('starFollow');
+  const concentric   = cb('starConcentric');
+  const rings        = iv('starRings');
+  const minR         = fv('starMinR');
+  const taper        = fv('starTaper');
   const tileGrid     = cb('starTile');
   const spacing      = fv('starSpacing');
   const stagger      = cb('starStagger');
   const tw           = fv('tileW'), th = fv('tileH');
-  const innerR       = outerR * innerRatio;
   const totalVerts   = points * 2;
   const tiles        = [];
 
@@ -1426,12 +1445,13 @@ function genStar(rng, W, H) {
     centers.push({ x: W / 2, y: H / 2 });
   }
 
-  // For each centre, place tiles along the star's edges
-  function drawStar(cx0, cy0) {
-    const verts = [];
+  // Draw one star at a given centre with a given outer radius and tile scale
+  function drawStar(cx0, cy0, starR, sf) {
+    const innerR = starR * innerRatio;
+    const verts  = [];
     for (let i = 0; i < totalVerts; i++) {
       const angle = (i / totalVerts) * 2 * Math.PI - Math.PI / 2;
-      const r     = (i % 2 === 0) ? outerR : innerR;
+      const r     = (i % 2 === 0) ? starR : innerR;
       verts.push({ x: cx0 + r * Math.cos(angle), y: cy0 + r * Math.sin(angle) });
     }
     for (let i = 0; i < totalVerts; i++) {
@@ -1440,13 +1460,25 @@ function genStar(rng, W, H) {
       const dx = b.x - a.x, dy = b.y - a.y;
       const edgeAngleDeg = Math.atan2(dy, dx) * 180 / Math.PI;
       for (let t = 0; t < tilesPerEdge; t++) {
-        const f  = (t + 0.5) / tilesPerEdge;
-        tiles.push({ cx: a.x + f * dx, cy: a.y + f * dy, w: tw, h: th, rot: follow ? edgeAngleDeg : 0 });
+        const f = (t + 0.5) / tilesPerEdge;
+        tiles.push({ cx: a.x + f * dx, cy: a.y + f * dy, w: tw * sf, h: th * sf, rot: follow ? edgeAngleDeg : 0 });
       }
     }
   }
 
-  centers.forEach(c => drawStar(c.x, c.y));
+  centers.forEach(({ x, y }) => {
+    if (concentric) {
+      for (let i = 0; i < rings; i++) {
+        const t      = rings === 1 ? 1 : i / (rings - 1);
+        const starR  = minR + (outerR - minR) * t;
+        // taper > 0: inner rings smaller, taper < 0: outer rings smaller
+        const sf     = Math.max(0.05, 1 - taper * (1 - t));
+        drawStar(x, y, starR, sf);
+      }
+    } else {
+      drawStar(x, y, outerR, 1);
+    }
+  });
   return tiles;
 }
 

@@ -572,6 +572,7 @@ input[type="color"] {
         <div class="ctrl">
           <div class="ctrl-label"><span>Weight</span></div>
           <div class="chips" id="txtWeight-chips" style="margin-bottom:0">
+            <div class="chip" data-tw="300">Light</div>
             <div class="chip" data-tw="400">Regular</div>
             <div class="chip active" data-tw="700">Bold</div>
             <div class="chip" data-tw="900">Black</div>
@@ -2038,10 +2039,18 @@ try {
 } catch(e) {}
 
 function persistGallery() {
-  try {
-    localStorage.setItem('hpg-gallery', JSON.stringify(gallery));
-    localStorage.setItem('hpg-n', _saveN);
-  } catch(e) { alert('localStorage full — delete some saves first.'); }
+  let attempts = gallery.length;
+  while (attempts-- > 0) {
+    try {
+      localStorage.setItem('hpg-gallery', JSON.stringify(gallery));
+      localStorage.setItem('hpg-n', _saveN);
+      return;
+    } catch(e) {
+      // Quota exceeded — drop the oldest entry and retry
+      gallery.pop();
+      renderGallery();
+    }
+  }
 }
 
 function captureSnapshot() {
@@ -2056,12 +2065,32 @@ function captureSnapshot() {
     appState:  { ...S },
     gradStops: gradStops.map(s => ({ ...s })),
     altColors: [...altColors],
-    svg:       buildSVG()
+    thumb:     ''
   };
 }
 
-function savePattern() {
-  gallery.unshift(captureSnapshot());
+function buildThumb() {
+  const svg = buildSVG();
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  const url  = URL.createObjectURL(blob);
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = 240; c.height = 136;
+      c.getContext('2d').drawImage(img, 0, 0, 240, 136);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.6));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(''); };
+    img.src = url;
+  });
+}
+
+async function savePattern() {
+  const snap = captureSnapshot();
+  snap.thumb = await buildThumb();
+  gallery.unshift(snap);
   persistGallery();
   renderGallery();
   // Open and scroll to gallery section
@@ -2146,7 +2175,7 @@ function renderGallery() {
   }
   empty.style.display = 'none';
   grid.innerHTML = gallery.map(snap => {
-    const uri = 'data:image/svg+xml,' + encodeURIComponent(snap.svg);
+    const uri = snap.thumb || (snap.svg ? 'data:image/svg+xml,' + encodeURIComponent(snap.svg) : '');
     return `
       <div class="gallery-item" onclick="loadPattern(${snap.id})">
         <img class="gallery-thumb" src="${uri}" alt="">

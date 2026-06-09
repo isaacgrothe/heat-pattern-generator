@@ -2030,27 +2030,66 @@ $('fps-chips').addEventListener('click', e => {
   document.querySelectorAll('#fps-chips .chip').forEach(ch => ch.classList.toggle('active', ch === c));
 });
 
-// ── Gallery ────────────────────────────────────────────────────────────────
+// ── Gallery (IndexedDB) ─────────────────────────────────────────────────────
 let gallery = [];
 let _saveN  = 0;
-try {
-  gallery = JSON.parse(localStorage.getItem('hpg-gallery') || '[]');
-  _saveN  = +localStorage.getItem('hpg-n') || 0;
-} catch(e) {}
+let _db     = null;
+try { _saveN = +localStorage.getItem('hpg-n') || 0; } catch(e) {}
+
+function _openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('hpg-db', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('gallery', { keyPath: 'id' });
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+async function _initGallery() {
+  try {
+    _db = await _openDB();
+    const tx  = _db.transaction('gallery', 'readonly');
+    const all = await new Promise((res, rej) => {
+      const r = tx.objectStore('gallery').getAll();
+      r.onsuccess = e => res(e.target.result);
+      r.onerror   = e => rej(e.target.error);
+    });
+    gallery = all.sort((a, b) => b.id - a.id);
+  } catch(e) {
+    // IndexedDB unavailable — fall back to localStorage
+    try { gallery = JSON.parse(localStorage.getItem('hpg-gallery') || '[]'); } catch(_) {}
+  }
+}
 
 function persistGallery() {
-  let attempts = gallery.length;
-  while (attempts-- > 0) {
-    try {
-      localStorage.setItem('hpg-gallery', JSON.stringify(gallery));
-      localStorage.setItem('hpg-n', _saveN);
-      return;
-    } catch(e) {
-      // Quota exceeded — drop the oldest entry and retry
-      gallery.pop();
-      renderGallery();
-    }
-  }
+  try { localStorage.setItem('hpg-n', _saveN); } catch(_) {}
+  if (!_db) return;
+  const tx    = _db.transaction('gallery', 'readwrite');
+  const store = tx.objectStore('gallery');
+  gallery.forEach(s => store.put(s));
+}
+
+function _dbDelete(id) {
+  if (!_db) return;
+  _db.transaction('gallery', 'readwrite').objectStore('gallery').delete(id);
+}
+
+function buildThumb() {
+  const svg = buildSVG();
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  const url  = URL.createObjectURL(blob);
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = 240; c.height = 136;
+      c.getContext('2d').drawImage(img, 0, 0, 240, 136);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.7));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(''); };
+    img.src = url;
+  });
 }
 
 function captureSnapshot() {
@@ -2065,26 +2104,9 @@ function captureSnapshot() {
     appState:  { ...S },
     gradStops: gradStops.map(s => ({ ...s })),
     altColors: [...altColors],
+    svg:       buildSVG(),
     thumb:     ''
   };
-}
-
-function buildThumb() {
-  const svg = buildSVG();
-  const blob = new Blob([svg], { type: 'image/svg+xml' });
-  const url  = URL.createObjectURL(blob);
-  return new Promise(resolve => {
-    const img = new Image();
-    img.onload = () => {
-      const c = document.createElement('canvas');
-      c.width = 240; c.height = 136;
-      c.getContext('2d').drawImage(img, 0, 0, 240, 136);
-      URL.revokeObjectURL(url);
-      resolve(c.toDataURL('image/jpeg', 0.6));
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(''); };
-    img.src = url;
-  });
 }
 
 async function savePattern() {
@@ -2154,8 +2176,18 @@ function loadPattern(id) {
 
 function deletePattern(id) {
   gallery = gallery.filter(s => s.id !== id);
-  persistGallery();
+  _dbDelete(id);
   renderGallery();
+}
+
+function downloadPatternSVG(id) {
+  const snap = gallery.find(s => s.id === id);
+  if (!snap?.svg) return;
+  const blob = new Blob([snap.svg], { type: 'image/svg+xml' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: snap.name + '.svg' });
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function renamePattern(id) {
@@ -2181,6 +2213,7 @@ function renderGallery() {
         <img class="gallery-thumb" src="${uri}" alt="">
         <div class="gallery-footer">
           <span class="gallery-name">${snap.name}</span>
+          <button class="gallery-act" onclick="event.stopPropagation();downloadPatternSVG(${snap.id})" title="Download SVG">↓</button>
           <button class="gallery-act" onclick="event.stopPropagation();renamePattern(${snap.id})" title="Rename">✎</button>
           <button class="gallery-act del" onclick="event.stopPropagation();deletePattern(${snap.id})" title="Delete">✕</button>
         </div>
@@ -2189,10 +2222,10 @@ function renderGallery() {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
-renderGallery();
 renderGradEditor();
 renderAltColors();
 update();
+_initGallery().then(renderGallery);
 </script>
 </body>
 </html>

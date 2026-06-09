@@ -611,6 +611,10 @@ input[type="color"] {
           </div>
         </div>
         <div class="ctrl">
+          <div class="ctrl-label"><span>Tracking</span><span class="ctrl-value" id="v-txtTracking">0</span><span style="color:#555;font-size:10px">%</span></div>
+          <input type="range" id="txtTracking" min="-10" max="20" step="0.5" value="0" oninput="sv('txtTracking');update()">
+        </div>
+        <div class="ctrl">
           <div class="ctrl-label"><span>X offset</span><span class="ctrl-value" id="v-txtOffX">0</span></div>
           <input type="range" id="txtOffX" min="-800" max="800" value="0" oninput="sv('txtOffX');update()">
         </div>
@@ -1205,10 +1209,11 @@ function genText(rng, W, H) {
   const offX     = fv('txtOffX') / sx;
   const offY     = fv('txtOffY') / sy;
 
-  ctx.font         = `${weight} ${fontSize}px ${font}`;
-  ctx.textAlign    = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle    = '#000';
+  ctx.font          = `${weight} ${fontSize}px ${font}`;
+  ctx.letterSpacing = (fv('txtTracking') / 100) + 'em';
+  ctx.textAlign     = 'center';
+  ctx.textBaseline  = 'middle';
+  ctx.fillStyle     = '#000';
   ctx.fillText(text, RW / 2 + offX, RH / 2 + offY);
 
   const pxData = ctx.getImageData(0, 0, RW, RH).data;
@@ -1736,6 +1741,7 @@ $('txtWeight-chips').addEventListener('click', e => {
   if (!c) return;
   S.txtWeight = c.dataset.tw;
   document.querySelectorAll('#txtWeight-chips .chip').forEach(ch => ch.classList.toggle('active', ch === c));
+  if (c.dataset.tw === '300') { $('txtTracking').value = -3; sv('txtTracking'); }
   update();
 });
 $('txtMode-chips').addEventListener('click', e => {

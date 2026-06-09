@@ -388,6 +388,7 @@ input[type="color"] {
         <div class="chip" data-p="star">Star</div>
         <div class="chip" data-p="flow">Flow</div>
         <div class="chip" data-p="persp">Perspective</div>
+        <div class="chip" data-p="mirror">Mirror</div>
         <div class="chip" data-p="text">Text</div>
       </div>
 
@@ -853,6 +854,34 @@ input[type="color"] {
           <input type="checkbox" id="perspFollow" checked onchange="update()">
           <span>Rotate tiles along ray</span>
         </label>
+      </div>
+
+      <!-- Mirror field -->
+      <div class="param-group" id="pg-mirror">
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Columns</span><span class="ctrl-value" id="v-mirrorCols">40</span></div>
+          <input type="range" id="mirrorCols" min="2" max="120" value="40" oninput="sv('mirrorCols');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Rows</span><span class="ctrl-value" id="v-mirrorRows">22</span></div>
+          <input type="range" id="mirrorRows" min="2" max="80" value="22" oninput="sv('mirrorRows');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Cell width</span><span class="ctrl-value" id="v-mirrorCellW">280</span></div>
+          <input type="range" id="mirrorCellW" min="20" max="1200" value="280" oninput="sv('mirrorCellW');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Cell height</span><span class="ctrl-value" id="v-mirrorCellH">200</span></div>
+          <input type="range" id="mirrorCellH" min="20" max="1200" value="200" oninput="sv('mirrorCellH');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Twist (°)</span><span class="ctrl-value" id="v-mirrorTwist">0</span></div>
+          <input type="range" id="mirrorTwist" min="-180" max="180" value="0" oninput="sv('mirrorTwist');update()">
+        </div>
+        <div class="ctrl">
+          <div class="ctrl-label"><span>Size taper</span><span class="ctrl-value" id="v-mirrorTaper">0.00</span></div>
+          <input type="range" id="mirrorTaper" min="-2" max="2" step="0.05" value="0" oninput="sv('mirrorTaper');update()">
+        </div>
       </div>
     </div>
   </div>
@@ -1631,6 +1660,47 @@ function genPersp(rng, W, H) {
   return tiles;
 }
 
+function genMirror(rng, W, H) {
+  const cols   = iv('mirrorCols');
+  const rows   = iv('mirrorRows');
+  const cellW  = Math.max(1, fv('mirrorCellW'));
+  const cellH  = Math.max(1, fv('mirrorCellH'));
+  const twist  = fv('mirrorTwist') * Math.PI / 180;
+  const taper  = fv('mirrorTaper');
+  const tw     = fv('tileW'), th = fv('tileH');
+  const stepX  = W / cols;
+  const stepY  = H / rows;
+  const tiles  = [];
+
+  // Mirror-fold v into [0, period], creating seamless reflection
+  function fold(v, period) {
+    const t = ((v % (2 * period)) + 2 * period) % (2 * period);
+    return t < period ? t : 2 * period - t;
+  }
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const px = (c + 0.5) * stepX;
+      const py = (r + 0.5) * stepY;
+
+      // Local position within mirrored cell (centred at 0)
+      const lx = fold(px, cellW) - cellW / 2;
+      const ly = fold(py, cellH) - cellH / 2;
+
+      // Radial angle from cell centre + twist offset
+      const angle = Math.atan2(ly, lx) + twist;
+
+      // Optional taper: tiles closer to cell edge are larger/smaller
+      const dist = Math.sqrt(lx * lx + ly * ly);
+      const maxD = Math.sqrt(cellW * cellW + cellH * cellH) / 2;
+      const sf   = taper !== 0 ? Math.max(0.05, 1 + taper * (dist / maxD - 0.5)) : 1;
+
+      tiles.push({ cx: px, cy: py, w: tw * sf, h: th * sf, rot: angle * 180 / Math.PI });
+    }
+  }
+  return tiles;
+}
+
 function genScatter(rng, W, H) {
   const count = iv('scatterCount');
   const minS = fv('scatterMin'), maxS = fv('scatterMax');
@@ -1812,7 +1882,7 @@ function buildSVG() {
   const rng = mkRng(fv('seed') | 0);
 
   // Generate + transform tiles
-  const gens = { grid: genGrid, spiral: genSpiral, radial: genRadial, wave: genWave, scatter: genScatter, burst: genBurst, text: genText, sunflower: genSunflower, hex: genHex, rings: genRings, lines: genLines, star: genStar, flow: genFlow, persp: genPersp };
+  const gens = { grid: genGrid, spiral: genSpiral, radial: genRadial, wave: genWave, scatter: genScatter, burst: genBurst, text: genText, sunflower: genSunflower, hex: genHex, rings: genRings, lines: genLines, star: genStar, flow: genFlow, persp: genPersp, mirror: genMirror };
   let tiles = gens[S.pattern](rng, W, H);
   tiles = tiles.map(t => ({ ...t, rot: t.rot + rotBase + (rng() - 0.5) * 2 * rotRand }));
   tiles = applySymmetry(tiles, S.sym, W, H);
@@ -2097,6 +2167,9 @@ const ANIM_PARAMS = [
   { label: 'Persp min dist', id: 'perspMinD',    min: 0,    max: 600  },
   { label: 'Persp max dist', id: 'perspMaxD',    min: 100,  max: 3000 },
   { label: 'Persp direction',id: 'perspDir',     min: 0,    max: 360  },
+  { label: 'Mirror cell W',  id: 'mirrorCellW',  min: 20,   max: 1200 },
+  { label: 'Mirror cell H',  id: 'mirrorCellH',  min: 20,   max: 1200 },
+  { label: 'Mirror twist',   id: 'mirrorTwist',  min: -180, max: 180  },
 ];
 
 let animFps       = 30;

@@ -362,7 +362,11 @@ input[type="color"] {
       <div class="ctrl">
         <div class="color-row">
           <span>Background</span>
-          <input type="color" id="bgColor" value="#000000" onchange="update()">
+          <div style="display:flex;align-items:center;gap:5px">
+            <button class="btn" onclick="$('bgColor').value='#000000';update()" title="Black" style="width:22px;height:22px;padding:0;background:#000;border:1px solid #444;border-radius:3px;flex-shrink:0"></button>
+            <button class="btn" onclick="$('bgColor').value='#ffffff';update()" title="White" style="width:22px;height:22px;padding:0;background:#fff;border:1px solid #666;border-radius:3px;flex-shrink:0"></button>
+            <input type="color" id="bgColor" value="#000000" onchange="update()">
+          </div>
         </div>
       </div>
     </div>
@@ -902,6 +906,10 @@ input[type="color"] {
           <span class="ctrl-value" id="v-tileH">210</span>
         </div>
         <input type="range" id="tileH" min="4" max="900" value="210" oninput="sv('tileH');update()">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-label"><span>Width taper</span><span class="ctrl-value" id="v-widthTaper">0.00</span></div>
+        <input type="range" id="widthTaper" min="-2" max="2" step="0.05" value="0" oninput="sv('widthTaper');update()">
       </div>
       <label class="check-row">
         <input type="checkbox" id="squareTiles" onchange="onSquareToggle()">
@@ -1889,6 +1897,17 @@ function buildSVG() {
   tiles = tiles.map(t => ({ ...t, rot: t.rot + rotBase + (rng() - 0.5) * 2 * rotRand }));
   tiles = applySymmetry(tiles, S.sym, W, H);
 
+  // Width taper: scale each tile's w based on radial distance from canvas center
+  const widthTaper = fv('widthTaper');
+  if (widthTaper !== 0) {
+    const norm = Math.hypot(W / 2, H / 2) || 1;
+    tiles = tiles.map(t => {
+      const dist = Math.hypot(t.cx - W / 2, t.cy - H / 2) / norm;
+      const wScale = Math.max(0.01, 1 + widthTaper * (0.5 - dist) * 2);
+      return { ...t, w: t.w * wScale };
+    });
+  }
+
   // Gradient def
   const gtAttr = ga ? ` gradientTransform="rotate(${ga},0.5,0.5)"` : '';
   const stops = gradStops.map(s => `<stop offset="${s.o.toFixed(2)}%" stop-color="${s.c}"/>`).join('');
@@ -2007,7 +2026,7 @@ function setSymmetry(s) {
 }
 
 // ── Fill mode ──────────────────────────────────────────────────────────────
-let altColors = ['#0000FF', '#E942FF', '#EA2481', '#F3842D'];
+let altColors = ['#266EFF', '#EBBA00', '#129961', '#CD99FD', '#0000FF'];
 
 function setFillMode(mode) {
   S.fillMode = mode;
@@ -2143,6 +2162,7 @@ const ANIM_PARAMS = [
   { label: 'Corner radius',   id: 'cornerRadius', min: 0,    max: 200  },
   { label: 'Tile width',      id: 'tileW',        min: 4,    max: 400  },
   { label: 'Tile height',     id: 'tileH',        min: 4,    max: 400  },
+  { label: 'Width taper',     id: 'widthTaper',   min: -2,   max: 2    },
   { label: 'Grid cols',       id: 'gridCols',     min: 1,    max: 60   },
   { label: 'Grid rows',       id: 'gridRows',     min: 1,    max: 60   },
   { label: 'Grid stagger',    id: 'gridStagger',  min: 0,    max: 1    },
